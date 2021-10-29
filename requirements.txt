@@ -1,0 +1,12 @@
+tqdm>=4.46.0
+numpy>=1.19.2
+torch>=1.7.1
+torchvision>=0.8.2
+mrcfile
+Pillow>=8.0.0
+matplotlib
+scikit-learn
+scikit-image
+jupyterlab
+ipywidgets
+tifffile>=2020.9.3
