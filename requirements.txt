@@ -10,3 +10,4 @@ scikit-image
 jupyterlab
 ipywidgets
 tifffile>=2020.9.3
+radontea
