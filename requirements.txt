@@ -11,3 +11,4 @@ jupyterlab
 ipywidgets
 tifffile>=2020.9.3
 radontea
+git+https://gitlab.com/paloha/gpuMultiprocessing

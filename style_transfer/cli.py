@@ -1,5 +1,11 @@
 """Neural style transfer (https://arxiv.org/abs/1508.06576) in PyTorch."""
 
+# Just identification of the script when running in parallel on multiple GPUs
+import os
+print('PID: {}, EXPNAME: {}, CUDA_VISIBLE_DEVICES: {}'.format(
+    os.getpid(), os.environ['EXPNAME'], os.environ['CUDA_VISIBLE_DEVICES']))
+
+
 import argparse
 import atexit
 from dataclasses import asdict
@@ -17,7 +23,10 @@ import torch
 import torch.multiprocessing as mp
 from tqdm import tqdm
 
-from . import srgb_profile, StyleTransfer
+# Changed by faket to fix imports in current project structure
+srgb_profile = (Path(__file__).resolve().parent / 'sRGB Profile.icc').read_bytes()
+from style_transfer import STIterate, StyleTransfer
+# from . import srgb_profile, StyleTransfer
 
 
 def prof_to_prof(image, src_prof, dst_prof, **kwargs):
@@ -263,7 +272,8 @@ def main():
     output_image = st.get_image(image_type)
     if output_image is not None:
         save_image(args.output, output_image)
-    with open('trace.json', 'w') as fp:
+    # with open('trace.json', 'w') as fp:
+    with open ((Path(args.output).resolve().parent  / 'trace.json'), 'w') as fp:
         json.dump(callback.get_trace(), fp, indent=4)
 
 
