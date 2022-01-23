@@ -6,6 +6,7 @@ from functools import partial
 import time
 import warnings
 
+
 import numpy as np
 from PIL import Image
 import torch
@@ -13,6 +14,8 @@ from torch import optim, nn
 from torch.nn import functional as F
 from torchvision import models, transforms
 from torchvision.transforms import functional as TF
+from skimage.transform import resize
+from matplotlib import cm
 
 class VGGFeatures(nn.Module):
     poolings = {'max': nn.MaxPool2d, 'average': nn.AvgPool2d, 'l2': partial(nn.LPPool2d, 2)}
@@ -209,6 +212,23 @@ def size_to_fit(size, max_dim, scale_up=False):
     return new_w, new_h
 
 
+def w_size_to_fit(img, max_dim, scale_up=False):
+    # Wrapper just to support numpy arrays
+    if isinstance(img, np.ndarray):
+        size = img.shape[:2]
+    else:
+        size = img.size
+    return size_to_fit(size, max_dim, scale_up)
+
+def img_resize(img, cw, ch):
+    # Wrapper for resize to support numpy arrays
+    if isinstance(img, np.ndarray):
+        return resize(img, (cw, ch, 3), order=1, anti_aliasing=True)
+    else:
+        return img.resize((cw, ch), Image.LANCZOS)
+    return img
+
+
 def gen_scales(start, end):
     scale = end
     i = 0
@@ -287,6 +307,13 @@ class StyleTransfer:
             elif image_type.lower() == 'np_uint16':
                 arr = image.cpu().movedim(0, 2).numpy()
                 return np.uint16(np.round(arr * 65535))
+            elif image_type.lower() == 'pil_cmap':
+                arr = Image.fromarray(np.uint8(cm.viridis(
+                    image.mean(dim=0).cpu().numpy())*255))
+                return arr
+            elif image_type.lower() == 'mrc':
+                # mrc input is grayscale so we mean the channels
+                return image.mean(dim=0).cpu().numpy()
             else:
                 raise ValueError("image_type must be 'pil' or 'np_uint16'")
 
@@ -300,7 +327,7 @@ class StyleTransfer:
                 initial_iterations: int = 1000,
                 step_size: float = 0.02,
                 avg_decay: float = 0.99,
-                init: str = 'content',
+                init = 'content',
                 style_scale_fac: float = 1.,
                 style_size: int = None,
                 callback=None):
@@ -314,26 +341,30 @@ class StyleTransfer:
             weight_sum = sum(abs(w) for w in style_weights)
             style_weights = [weight / weight_sum for weight in style_weights]
         if len(style_images) != len(style_weights):
+            print(len(style_images), len(style_weights), style_weights)
             raise ValueError('style_images and style_weights must have the same length')
 
         tv_loss = Scale(LayerApply(TVLoss(), 'input'), tv_weight)
 
         scales = gen_scales(min_scale, end_scale)
 
-        cw, ch = size_to_fit(content_image.size, scales[0], scale_up=True)
-        if init == 'content':
-            self.image = TF.to_tensor(content_image.resize((cw, ch), Image.LANCZOS))[None]
-        elif init == 'gray':
-            self.image = torch.rand([1, 3, ch, cw]) / 255 + 0.5
-        elif init == 'uniform':
-            self.image = torch.rand([1, 3, ch, cw])
-        elif init == 'style_mean':
-            means = []
-            for i, image in enumerate(style_images):
-                means.append(TF.to_tensor(image).mean(dim=(1, 2)) * style_weights[i])
-            self.image = torch.rand([1, 3, ch, cw]) / 255 + sum(means)[None, :, None, None]
+        cw, ch = w_size_to_fit(content_image, scales[0], scale_up=True)
+        if isinstance(init, str):
+            if init == 'content':
+                self.image = TF.to_tensor(img_resize(content_image, cw, ch))[None]
+            elif init == 'gray':
+                self.image = torch.rand([1, 3, ch, cw]) / 255 + 0.5
+            elif init == 'uniform':
+                self.image = torch.rand([1, 3, ch, cw])
+            elif init == 'style_mean':
+                means = []
+                for i, image in enumerate(style_images):
+                    means.append(TF.to_tensor(image).mean(dim=(1, 2)) * style_weights[i])
+                self.image = torch.rand([1, 3, ch, cw]) / 255 + sum(means)[None, :, None, None]
+            else:
+                raise ValueError("init must be one of 'content', 'gray', 'uniform', 'style_mean'")
         else:
-            raise ValueError("init must be one of 'content', 'gray', 'uniform', 'style_mean'")
+            self.image = TF.to_tensor(img_resize(init, cw, ch))[None]
         self.image = self.image.to(self.devices[0])
 
         opt = None
@@ -344,8 +375,8 @@ class StyleTransfer:
             if self.devices[0].type == 'cuda':
                 torch.cuda.empty_cache()
 
-            cw, ch = size_to_fit(content_image.size, scale, scale_up=True)
-            content = TF.to_tensor(content_image.resize((cw, ch), Image.LANCZOS))[None]
+            cw, ch = w_size_to_fit(content_image, scale, scale_up=True)
+            content = TF.to_tensor(img_resize(content_image, cw, ch))[None]
             content = content.to(self.devices[0])
 
             self.image = interpolate(self.image.detach(), (ch, cw), mode='bicubic').clamp(0, 1)
@@ -362,10 +393,10 @@ class StyleTransfer:
             style_targets, style_losses = {}, []
             for i, image in enumerate(style_images):
                 if style_size is None:
-                    sw, sh = size_to_fit(image.size, round(scale * style_scale_fac))
+                    sw, sh = w_size_to_fit(image, round(scale * style_scale_fac))
                 else:
-                    sw, sh = size_to_fit(image.size, style_size)
-                style = TF.to_tensor(image.resize((sw, sh), Image.LANCZOS))[None]
+                    sw, sh = w_size_to_fit(image, style_size)
+                style = TF.to_tensor(img_resize(image, sw, sh))[None]
                 style = style.to(self.devices[0])
                 print(f'Processing style image ({sw}x{sh})...')
                 style_feats = self.model(style, layers=self.style_layers)
