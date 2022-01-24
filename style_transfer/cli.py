@@ -180,7 +180,6 @@ class Callback:
         self.progress.update()
         if iterate.i == iterate.i_max:
             self.progress.close()
-            save_image(out_fpath, self.st.get_image(self.image_type))
 
     def close(self):
         if self.progress is not None:
@@ -296,7 +295,7 @@ def main():
         init = args.init
 
     # Specifying callback and output image type 
-    output_image_path = args.output
+    output_image_path = Path(args.output)
     if input_type == 'mrc':
         # Final image output type and path
         output_image_type = 'mrc'
@@ -383,7 +382,8 @@ def main():
         output_image.append(st.get_image(output_image_type))
         
         # Save the config in the same folder as the output
-        with open ((Path(output_image_path).resolve().parent  / 'trace.json'), 'w') as fp:
+        os.makedirs(output_image_path.parent, exist_ok=True)
+        with open(output_image_path.with_suffix('.json'), 'w') as fp:
             json.dump(callback.get_trace(), fp, indent=4)
 
     if input_type == 'mrc':
