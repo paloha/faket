@@ -171,22 +171,15 @@ class Callback:
         self.iterates.append(asdict(iterate))
         if iterate.i == 1:
             self.progress = tqdm(total=iterate.i_max, dynamic_ncols=True)
+        out_fpath = self.args.output.format(self.seq_i, iterate.w, iterate.h, iterate.i)
         if iterate.i % self.args.save_every == 0:
             msg = f'Image: {self.seq_i}/{self.seq_len} '
             msg += 'Size: {}x{}, iteration: {}, loss: {:g}'
             tqdm.write(msg.format(iterate.w, iterate.h, iterate.i, iterate.loss))
+            save_image(out_fpath, self.st.get_image(self.image_type))
         self.progress.update()
-        if self.web_interface is not None:
-            self.web_interface.put_iterate(iterate, self.st.get_image_tensor())
         if iterate.i == iterate.i_max:
             self.progress.close()
-            if max(iterate.w, iterate.h) != self.args.end_scale:
-                save_image(self.args.output, self.st.get_image(self.image_type))
-            else:
-                if self.web_interface is not None:
-                    self.web_interface.put_done()
-        elif iterate.i % self.args.save_every == 0:
-            out_fpath = self.args.output.format(self.seq_i, iterate.i, iterate.w, iterate.h)
             save_image(out_fpath, self.st.get_image(self.image_type))
 
     def close(self):
@@ -254,6 +247,10 @@ def main():
                    help='the port the web interface binds to')
     p.add_argument('--browser', type=str, default='', nargs='?',
                    help='open a web browser (specify the browser if not system default)')
+    p.add_argument('--seq_start', type=int, default=0,
+                   help="if content is mrc, start of the range of images to be processed")
+    p.add_argument('--seq_end', type=int, default=None,
+                   help="if content is mrc, end of the range of images to be processed")
 
     args = p.parse_args()
     
@@ -268,7 +265,7 @@ def main():
         
         assert args.output.endswith('.mrc'), \
         'If content is mrc file, output must also be mrc file.' \
-        'Save every will be set to `IMG{:02d}_i{:05d}_{}x{}_mrcfname.png`automatically'
+        'Save every will be set to `IMG{:02d}_{}x{}_i{:05d}_mrcfname.png`automatically'
         
         content_mrc = normalize(load_mrc(args.content))
         assert len(content_mrc.shape) == 3, \
@@ -307,7 +304,7 @@ def main():
         # image_type = 'pil'  # standard greyscale png
         image_type = 'pil_cmap'  # greyscale image (mean of RGB) + viridis cmap
         p = Path(args.output)
-        args.output = args.output.replace(p.name, 'IMG{:02d}_i{:05d}_{}x{}_' + p.stem + '.png')
+        args.output = args.output.replace(p.name, 'IMG{:02d}_{}x{}_i{:05d}_' + p.stem + '.png')
     else:
         image_type = 'pil'
         if Path(args.output).suffix.lower() in {'.tif', '.tiff'}:
@@ -356,7 +353,9 @@ def main():
     output_image = []
     seq_len = 1 if input_type == 'image' else content_mrc.shape[0]
     
-    for i in range(seq_len):
+    seq_end = args.seq_end or seq_len
+    assert seq_end <= seq_len, f'seq_end max is {seq_len}'
+    for i in range(args.seq_start, seq_end):
         # print(f'Processing image {i}/{seq_len}')
         # Since the NST works on RGB images only, we have to 
         # copy the data 3x along the last axis
@@ -382,19 +381,21 @@ def main():
             break
 
         output_image.append(st.get_image(output_image_type))
+        
+        # Save the config in the same folder as the output
+        with open ((Path(output_image_path).resolve().parent  / 'trace.json'), 'w') as fp:
+            json.dump(callback.get_trace(), fp, indent=4)
 
     if input_type == 'mrc':
         # Saving the full sequence of mrc outputs
-        output_image = match_mean_std(np.array(output_image), style_mrc_orig)
+        output_image = match_mean_std(np.array(output_image), style_mrc_orig[args.seq_start:seq_end])
         save_mrc(output_image, output_image_path, overwrite=True)
     else:
         # Saving one image output
         if output_image[0] is not None:
             save_image(output_image_path, output_image[0])
         
-    # Save the config in the same folder as the output
-    with open ((Path(output_image_path).resolve().parent  / 'trace.json'), 'w') as fp:
-        json.dump(callback.get_trace(), fp, indent=4)
+    
 
 
 if __name__ == '__main__':
