@@ -1,8 +1,4 @@
-# This script computes recall, precision and f1-score for each object class, and prints out the result in log files.
-# The evaluation is based on a script used for the challenge "SHREC 2019: Classification in cryo-electron tomograms"
-
-# This script needs python3 and additional packages (see evaluate.py), as it was coded by SHREC'19 organizers. The 
-# scores have been published in Gubins & al., "SHREC'19 track: classification in cryo-electron tomograms", 2019
+import argparse
 
 import sys
 
@@ -11,8 +7,13 @@ import utils.objl as ol
 
 import configparser
 
+# parse path to config
+parser = argparse.ArgumentParser()
+parser.add_argument("--path_config", type=str, help="path to the config.ini of the experiments")
+args = parser.parse_args()
+
 config = configparser.ConfigParser()
-config.read('deepfinder/config_loc_class.ini')
+config.read(path_config + 'config_loc_class.ini')
 
 # load config information
 models = config['trained_DF_weights']['models'].split()
@@ -22,7 +23,7 @@ test_tomos = config['trained_DF_weights']['test_tomos'].split()
 
 for test_tomo in test_tomos:
     for model, num_epochs in zip(models, num_epochs_list):
-        path = 'data/deepfinder/localization_classification/'
+        path = 'results/'
         
         objl_path = path + model + '/tomo9_'+test_tomo+'_2021_'+num_epochs+'epoch_bin1_objlist_thr.xml'
 
@@ -43,4 +44,5 @@ for test_tomo in test_tomos:
             file.write(class_name[lbl]+' '+str(x)+' '+str(y)+' '+str(z)+'\n')
         file.close()
 
-        os.system('python deepfinder/eval.py -s '+path+model+'/particle_locations_tomo9_'+test_tomo+'_2021.txt -t data/shrec2021_extended_dataset/model_9/faket/ -o '+path+model+'/report_'+model+'_'+test_tomo+'_bin1_2021.txt')
+        
+        os.system('python data/shrec2021_extended_dataset/misc/eval.py -s '+path+model+'/particle_locations_tomo9_'+test_tomo+'_2021.txt -t data/shrec2021_extended_dataset/model_9/faket/ -o '+path+model+'/report_'+model+'_'+test_tomo+'_bin1_2021.txt')

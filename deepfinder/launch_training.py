@@ -1,6 +1,6 @@
 import sys
 import os
-#sys.path.append('../../../') # add parent folder to path
+import argparse
 
 
 
@@ -22,20 +22,26 @@ os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
+# parse path to config
+parser = argparse.ArgumentParser()
+parser.add_argument("--path_config", type=str, help="path to the config.ini of the experiment")
+args = parser.parse_args()
+
+path_config = args.path_config
+
+
 
 # load settings
 import configparser
 
 config = configparser.ConfigParser()
-config.read('deepfinder/config_training.ini')
+config.read(path_config + 'config.ini')
 train_tomos = config['training_setting']['training_tomograms'].split()
 num_epochs = int(config['training_setting']['num_epochs'])
 out_path = config['training_setting']['out_path']
 gpu_no = config['training_setting']['gpu_no']
 continue_training = bool(int(config['training_setting']['continue_training']))
 continue_training_path = config['training_setting']['continue_training_path']
-
-
 
 
 # set GPU id according to config
@@ -63,26 +69,16 @@ for tomo in train_tomos:
     path_particle_locations.append(path_part_loc)
 
 
-#test paths
-#for path in path_target:
-#    print(path)
+
     
 # create objl_train according to path_data
 objl_train = produce_objl.create_objl(path_particle_locations)
 filename = 'deepfinder/test.xml'
-#ol.write(objl, filename)
+
 
 # create objl_valid as in the original Deep-Finder repo
 objl_valid = produce_objl.create_objl([path_particle_locations[-1]], int(train_tomos[-1][0]))
 
-#ol.write(objl_valid, filename)
-
-#sys.exit()
-
-#path_objl_train = 'in/object_list_train.xml'
-#path_objl_train = 'objl_training_2021.xml'
-#path_objl_valid = 'in/object_list_valid.xml'
-#path_objl_valid = 'objl_valid_2021.xml'
 
 #Nclass = 13
 Nclass = 16
@@ -94,7 +90,6 @@ trainer.path_out         = out_path # output path
 trainer.h5_dset_name     = 'dataset' # if training data is stored as h5, you can specify the h5 dataset
 trainer.batch_size       = 25
 trainer.epochs           = num_epochs
-#trainer.steps_per_epoch  = 100
 trainer.Nvalid           = 10 # steps per validation
 trainer.flag_direct_read     = False
 trainer.flag_batch_bootstrap = True
@@ -104,10 +99,6 @@ trainer.class_weights = None # keras syntax: class_weights={0:1., 1:10.} every i
 # Use following line if you want to resume a previous training session:
 if continue_training:
     trainer.net.load_weights(continue_training_path)
-
-# Load object lists:
-#objl_train = ol.read_xml(path_objl_train)
-#objl_valid = ol.read_xml(path_objl_valid)
 
 # Finally, launch the training procedure:
 trainer.launch(path_data, path_target, objl_train, objl_valid)

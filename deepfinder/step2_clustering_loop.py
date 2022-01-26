@@ -1,5 +1,5 @@
 import sys
-
+import argparse
 import os
 
 
@@ -10,8 +10,13 @@ import utils.objl as ol
 
 import configparser
 
+# parse path to config
+parser = argparse.ArgumentParser()
+parser.add_argument("--path_config", type=str, help="path to the config.ini of the experiments")
+args = parser.parse_args()
+
 config = configparser.ConfigParser()
-config.read('deepfinder/config_loc_class.ini')
+config.read(path_config + 'config_loc_class.ini')
 
 # load config information
 models = config['trained_DF_weights']['models'].split()
@@ -24,14 +29,14 @@ for test_tomo in test_tomos:
         
 
         # Input parameters:
-        path_labelmap = 'data/deepfinder/localization_classification/'+ model  +\
+        path_labelmap = 'results/'+ model  +\
                         '/tomo9_'+test_tomo+'_2021_'+ num_epochs +\
                         'epochs_bin1_labelmap.mrc'
         cluster_radius = 5         # should correspond to average radius of target objects (in voxels)
         cluster_size_threshold = 1 # found objects smaller than this threshold are immediately discarded
 
         # Output parameter:
-        path_output = 'data/deepfinder/localization_classification/' + model + '/'
+        path_output = 'results/' + model + '/'
 
 
         # Load data:

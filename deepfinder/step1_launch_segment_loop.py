@@ -1,4 +1,5 @@
 import sys
+import argparse
 
 from inference import Segment
 import utils.common as cm
@@ -10,8 +11,17 @@ import os
 
 import configparser
 
+
+# parse path to config
+parser = argparse.ArgumentParser()
+parser.add_argument("--path_config", type=str, help="path to the config.ini of the experiments")
+args = parser.parse_args()
+
+
+path_config = args.path_config
+
 config = configparser.ConfigParser()
-config.read('deepfinder/config_loc_class.ini')
+config.read(path_config + 'config_loc_class.ini')
 
 # load config information
 models = config['trained_DF_weights']['models'].split()
@@ -21,12 +31,13 @@ GPU_no = config['GPU_no']['GPU_no']
 
 
 
+
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 os.environ['CUDA_VISIBLE_DEVICES'] = GPU_no
 
 # create output folders if they dont exist already
 for model in models:
-    path = 'data/deepfinder/localization_classification/'+ model
+    path = 'results/'+ model
     if os.path.exists(path)==False:
         os.makedirs(path) 
 
@@ -47,11 +58,11 @@ for test_tomo in test_tomos:
     for model, num_epochs in zip(models, num_epochs_list):
 
         # Input parameters:
-        path_weights = 'data/deepfinder/trained_models/'+ model + \
+        path_weights = 'results/'+ model + \
                         '/net_weights_epoch'+ str(num_epochs)  +'.h5'
 
         # Output parameter:
-        path_output = 'data/deepfinder/localization_classification/'+ model
+        path_output = 'results/'+ model
 
 
 
