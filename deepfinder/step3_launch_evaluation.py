@@ -45,4 +45,4 @@ for test_tomo in test_tomos:
         file.close()
 
         
-        os.system('python data/shrec2021_extended_dataset/misc/eval.py -s '+path+model+'/particle_locations_tomo9_'+test_tomo+'_2021.txt -t data/shrec2021_extended_dataset/model_9/faket/ -o '+path+model+'/report_'+model+'_'+test_tomo+'_bin1_2021.txt')
+        os.system('python data/shrec2021_extended_dataset/misc/eval.py -s '+path+model+'/particle_locations_tomo9_'+test_tomo+'_2021.txt -t data/shrec2021_extended_dataset/model_9/faket/ -o '+path+model+'/report_'+model+'_'+test_tomo+'_'+num_epochs+'epochs_bin1_2021.txt')
