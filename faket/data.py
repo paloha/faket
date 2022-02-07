@@ -5,35 +5,27 @@ import zipfile
 import radontea
 import numpy as np
 from numpy.fft import fft2, ifft2
-        
-def load_mrc(data_folder, N, mrc_name):
-    """
-    Loads the mrc.data of a specified mrc file from the
-    tomogram folder at index N.
-    """
-    tomogram_folder = os.path.join(data_folder, f'model_{N}')
-    file = os.path.join(tomogram_folder, mrc_name)
-
-    with mrcfile.open(file, permissive=True) as mrc:
-        # the tomo data is now accessible via .data, in following order: Z Y X
-        print('Loaded data of shape:', mrc.data.shape)
-        print('Size of the data:', mrc.data.nbytes / float(1000**3), 'GB')
-        data = mrc.data.copy()
-    return data
 
 
-def save_mrc(data, data_folder, N, mrc_name, overwrite=False):
+def load_mrc(path):
     """
-    Saves the data into a mrc file of specified name
-    into the tomogram folder at index N.
+    Loads the mrc.data from a specified path
     """
-    tomogram_folder = os.path.join(data_folder, f'model_{N}')
-    file = os.path.join(tomogram_folder, mrc_name)
-    os.makedirs(os.path.dirname(file), exist_ok=True)
-    with mrcfile.new(file, overwrite=overwrite) as mrc:
+    import mrcfile
+    with mrcfile.open(path, permissive=True) as mrc:
+        return mrc.data.copy()
+    
+    
+def save_mrc(data, path, overwrite=False):
+    """
+    Saves the data into a mrc file.
+    """
+    import mrcfile
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with mrcfile.new(path, overwrite=overwrite) as mrc:
         mrc.set_data(data)
-        
-        
+
+
 def get_theta(data_folder, N):
     """
     Opens the 'alignment_simulated.txt' file from desired tomogram
@@ -95,12 +87,12 @@ def vol_to_valid(data_folder, N, fname, z_valid, out_fname=None):
     z_valid normalized between 0 and 1 and saves it
     as a mrc file with '_valid' suffix.
     """
-    print(f'# Slicing {fname} {N}' )
-    square = load_mrc(data_folder, N, f'{fname}.mrc')
+    print(f'# Slicing {fname} {N}')
+    square = load_mrc(os.path.join(data_folder, N, f'{fname}.mrc'))
     assert square.shape[0] == square.shape[1], 'Not square'
     valid = slice_to_valid(square, *z_valid)
     out_fname = out_fname or f'{fname}_valid.mrc'
-    save_mrc(valid.astype(np.float32), data_folder, N, out_fname, overwrite=True)
+    save_mrc(valid.astype(np.float32), os.path.join(data_folder, N, out_fname), overwrite=True)
     print(f'-- DONE slicing {fname} {N} to valid range and saving as mrc file.')
     
     
@@ -153,53 +145,3 @@ def downsample_sinogram_space(sinogram, n, order):
     """
     from scipy.ndimage import zoom
     return zoom(sinogram, (1.0, 1 / n, 1 / n), order=order)
-
-
-# TODO ADJUST THIS TO HANDLE THE EXTENDED DATASET
-# def prepare_shrec21(zip_url=None, zip_fname=None, zip_dir=None):
-#     # As of 27.05.2021 available at https://www.shrec.net/cryo-et/ from the Google Drive link
-#     zip_url = zip_url or 'https://drive.google.com/file/d/1KcNkdKitxDt_Jhlg6kgFRUncpoEKC1vQ'
-#     zip_fname = zip_fname or 'shrec2021_contest_dataset.zip'
-#     zip_dir = zip_dir or 'data'
-#     zip_path = os.path.join(zip_dir, zip_fname)
-#     data_folder = os.path.splitext(zip_path)[0]  # Relative to project root
-#     anticipated_size = 7823307210  # Sanity check the zip file
-#     anticipated_files = {'misc', 'model_0', 'model_1', 'model_2', 
-#                          'model_3', 'model_4', 'model_5', 'model_6',
-#                          'model_7', 'model_8', 'model_9', 'readme.txt'}
-    
-#     if not os.path.isdir(data_folder):        
-#         print('Extracted data not found. Searching for zip archive.' )
-
-#         # Getting the zip file from user
-#         while not os.path.isfile(zip_path):
-#             print(f'{zip_path} does not exist.' )
-#             print(f'Provide the data. (Should be available from {zip_url}).')
-#             input('Hit Enter to continue.')
-
-#         # Checking the zip size
-#         zip_size = os.path.getsize(zip_path)
-#         if anticipated_size == zip_size:
-#             print('Sanity check OK | Zip archive matches anticipated size.')
-#         else:
-#             print(f'Zip archive size {zip_size} does not match anticipated size {anticipated_size}.')
-#             print('Please make sure you have downloaded the correct version of the dataset.')
-
-#         # Extracting the zip file
-#         print(f'Unpacking {zip_fname}. Please wait...')
-#         try:
-#             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-#                 zip_ref.extractall(data_folder)
-#         except Exception as e:
-#             print(e)
-#         print('Unpacking successful.')
-#     else:
-#         print('Extracted data found.')
-
-#     # Sanity check folder content
-#     if set(os.listdir(data_folder)) != anticipated_files:
-#         print(f'Data folder does not contain the anticipated files. {sorted(anticipated_files)}')
-#     else:
-#         print(f'The data folder contains anticipated files.')
-    
-#     return data_folder

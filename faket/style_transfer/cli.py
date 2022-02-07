@@ -9,8 +9,6 @@ import json
 from pathlib import Path
 import platform
 import sys
-# import webbrowser
-
 import numpy as np
 from PIL import Image, ImageCms
 from tifffile import TIFF, TiffWriter
@@ -20,56 +18,9 @@ from tqdm import tqdm
 
 # Changed by faket to fix imports in current project structure
 srgb_profile = (Path(__file__).resolve().parent / 'sRGB Profile.icc').read_bytes()
-from style_transfer import STIterate, StyleTransfer
-# from . import srgb_profile, StyleTransfer
+from .style_transfer import STIterate, StyleTransfer
+from ..data import load_mrc, save_mrc, normalize, match_mean_std
 
-def load_mrc(path):
-    """
-    Loads the mrc.data from a specified path
-    """
-    import mrcfile
-    with mrcfile.open(path, permissive=True) as mrc:
-        return mrc.data.copy()
-    
-    
-def save_mrc(data, path, overwrite=False):
-    """
-    Saves the data into a mrc file.
-    """
-    import mrcfile
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    # tqdm.write(f'Writing mrc file to {path}.')
-    with mrcfile.new(path, overwrite=overwrite) as mrc:
-        mrc.set_data(data)
-        
-def normalize(x):
-    """
-    Shifts and scales an array into [0, 1]
-    """
-    n = x.copy()
-    n -= n.min()
-    n /= n.max()
-    return n
-
-def match_mean_std(vol1, vol2): 
-    """
-    Matches mean and std of all arrays
-    in vol1 according to mean and std
-    of respective arrays in vol2.
-    """
-    n_tilts = vol1.shape[0]
-    assert n_tilts == vol2.shape[0]
-    r = lambda x: x.reshape(n_tilts, -1)
-    
-    vol1s = r(vol1).std(-1).reshape(-1,1,1)
-    vol2s = r(vol2).std(-1).reshape(-1,1,1)
-    vol1 = vol1 / vol1s * vol2s
-    
-    vol1m = r(vol1).mean(-1).reshape(-1,1,1)
-    vol2m = r(vol2).mean(-1).reshape(-1,1,1)
-    vol1 -= (vol1m - vol2m)
-    return vol1 
-    
 
 def prof_to_prof(image, src_prof, dst_prof, **kwargs):
     src_prof = io.BytesIO(src_prof)
