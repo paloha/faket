@@ -1,12 +1,12 @@
 from radontea import backproject_3d
 import numpy as np
 from numpy.fft import fft2, ifft2
-from .data import load_mrc, save_mrc
-from .data import get_theta, slice_to_valid
+from .data import load_mrc, save_mrc, save_conf
+from .data import get_theta_from_alignment, slice_to_valid
 from .data import downsample_sinogram_space
 from .data import downsample_sinogram_theta
 from .filter import ramp2d, rampShrec
-import json
+
 
 def reconstruct_mrc(**kwargs):
     """
@@ -18,17 +18,19 @@ def reconstruct_mrc(**kwargs):
     Parameters
     ----------
     **kwargs: dict
-        Keyword arguments to `reconstruct` containing
-        `input_mrc` instead `sinogram` and `theta`.
-        Where `input_mrc` is a path to a mrc file 
-        containing the projections.
+        Keyword arguments to `reconstruct` containing `input_mrc` instead of `sinogram`.
+        Where `input_mrc` is a path to a mrc file containing the projections.
+        Here, `theta` can be a full path to `alignment_simulated.txt` from where
+        the information about tilt angles will be read, or a list (not a numpy array).
     """
+    input_mrc = kwargs['input_mrc']
     print(f'# Processing: {input_mrc}')
     sinogram = load_mrc(input_mrc)
-    theta = get_theta(os.path.dirname(input_mrc))
-    kwargs.update({'theta': theta})
+    if isinstance(kwargs['theta'], str):
+        theta = get_theta_from_alignment(kwargs['theta'])
+        kwargs.update({'theta': theta})
     if kwargs['output_mrc'] is not None:
-        json.dump(kwargs, os.path.splitext(kwargs['output_mrc'])[0] + '.json', indent=4)
+        save_conf(kwargs['output_mrc'], kwargs)
     del kwargs['input_mrc']
     return reconstruct(sinogram, **kwargs)
 
@@ -46,7 +48,7 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
     sinogram:  ndarray, shape (θ, Y, M)
         Three-dimensional array containing the projections.
         Axis 0 contains projections. Axis 1 is the tilt axis.
-    theta: ndarray, shape (θ,)
+    theta: list or ndarray, shape (θ,)
         One-dimensional array of tilt angles in degrees. 
     downsample_angle: int, default=1 (no downsampling)
         Sinogram downsampling in theta dimension with int step.

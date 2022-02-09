@@ -1,5 +1,6 @@
 import os
 import csv
+import json
 import mrcfile
 import zipfile
 import radontea
@@ -26,18 +27,39 @@ def save_mrc(data, path, overwrite=False):
         mrc.set_data(data)
 
 
-def get_theta(data_folder, N):
+def save_conf(path:str, conf:dict):
+    """
+    Saves conf as json to the file of the same 
+    name as provided in the path just with the
+    json extension. E.g. if path is `foo/bar.mrc`,
+    saved file will be `foo/bar.json`.
+    """
+    path = os.path.splitext(path)[0] + '.json'
+    with open(path, 'w') as fl:
+            json.dump(conf, fl, indent=4)
+
+
+def get_theta_from_alignment(path):
+    """
+    Opens the `alignment_simulated.txt` file provided for each
+    tomogram in the SHREC2021 dataset and parses the information
+    about the tilt angles. 
+    """
+    with open(path, 'r') as tsv:
+        rows = list(csv.reader(tsv, delimiter=' ', skipinitialspace=True))[6:]  # Omitting first rows
+        theta = [float(row[2]) for row in rows]
+        assert len(theta) == 61, f'Problem in loading theta from {file}. Number of angles is not 61.'
+    return theta
+
+
+def get_theta(data_folder=None, N=None):
     """
     Opens the 'alignment_simulated.txt' file from desired tomogram
     and returns the np.array of tilt angles (floats).
     """
     tomogram_folder = os.path.join(data_folder, f'model_{N}')
     file = os.path.join(tomogram_folder, 'alignment_simulated.txt')
-    with open(file, 'r') as tsv:
-        rows = list(csv.reader(tsv, delimiter=' ', skipinitialspace=True))[6:]  # Omitting first rows
-        theta = [float(row[2]) for row in rows]
-        assert len(theta) == 61, f'Problem in loading theta from {file}. Number of angles is not 61.'
-    return np.array(theta)
+    return get_theta_from_alignment(file)
 
 
 def get_clim(data, lo=0.01, up=0.99):
@@ -133,7 +155,7 @@ def downsample_sinogram_theta(sinogram, theta, step):
     0 tilt is assumed to be the middle tilt in theta. 
     See 'theta_subsampled_indices' for more info.
     """
-    indices = theta_subsampled_indices(theta.size, step)    
+    indices = theta_subsampled_indices(len(theta), step)    
     return sinogram[indices], theta[indices]
     
     
