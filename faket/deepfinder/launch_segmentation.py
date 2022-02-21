@@ -1,0 +1,73 @@
+import sys
+import argparse
+
+from segmentation import Segment
+import utils.common as cm
+import utils.smap as sm
+
+
+import os
+
+
+
+# parse path to config
+parser = argparse.ArgumentParser()
+parser.add_argument("--test_tomo_path", type=str, help="path to tomograms to be segmented")
+parser.add_argument("--test_tomogram", type=str, help="tomogram to be segmented", default="baseline")
+parser.add_argument("--test_tomo_idx", type=int, help="folder index of test tomogram")
+parser.add_argument("--num_epochs", type=str, help="number of epochs deep finder was trained")
+parser.add_argument("--DF_weights_path", type=str, help="path to trained weights of deep finder")
+parser.add_argument("--out_path", type=str, help="out path for the mrc file resulting from segmentation")
+args = parser.parse_args()
+
+
+
+model = args.DF_weights_path
+num_epochs = args.num_epochs
+test_tomo = args.test_tomogram
+
+
+
+
+
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+
+# create output folders if they dont exist already
+path = args.out_path
+if os.path.exists(path)==False:
+    os.makedirs(path) 
+
+
+Nclass       = 16
+patch_size   = 160 # must be multiple of 4
+
+
+path_tomo = args.test_tomo_path + 'model_' + str(args.num_epochs) +\
+        '/faket/reconstruction_' + args.test_tomogram + '.mrc'
+    
+# Load data:
+tomo = cm.read_array(path_tomo)
+
+# Input parameters:
+path_weights = args.DF_weights_path + '/net_weights_epoch'+ str(num_epochs) +'.h5'
+
+# Initialize segmentation task:
+seg  = Segment(Ncl=Nclass, path_weights=path_weights, patch_size=patch_size)
+
+# Segment tomogram:
+scoremaps = seg.launch(tomo)
+
+# Get labelmap from scoremaps:
+labelmap  = sm.to_labelmap(scoremaps)
+
+# Bin labelmap for the clustering step (saves up computation time):
+scoremapsB = sm.bin(scoremaps)
+labelmapB  = sm.to_labelmap(scoremapsB)
+
+# Save labelmaps:
+cm.write_array(labelmap , path + '/tomo9_'+test_tomo+'_2021_'+ str(num_epochs)  +'epochs_labelmap.mrc')
+cm.write_array(labelmapB, path + '/tomo9_'+test_tomo+'_2021_'+ str(num_epochs)  +'epochs_bin1_labelmap.mrc')
+
+
+

@@ -170,6 +170,9 @@ class Train(core.DeepFinder):
 
         self.class_weight = None
         self.sample_weights = None  # np array same lenght as objl_train
+        
+        #save regularly every k'th epoch
+        self.save_every = None
 
         self.check_attributes()
 
@@ -328,7 +331,7 @@ class Train(core.DeepFinder):
             process_time.append(end - start)
             self.display('-------------------------------------------------------------')
             self.display('EPOCH %d/%d - valid loss: %0.3f - valid acc: %0.3f - %0.2fsec' % (
-            e + 1, self.epochs, loss_val[0], loss_val[1], end - start))
+                e + 1, self.epochs, loss_val[0], loss_val[1], end - start))
 
 
             # Save and plot training history:
@@ -339,9 +342,10 @@ class Train(core.DeepFinder):
             core.plot_history(history, self.path_out+'net_train_history_plot.png')
 
             self.display('=============================================================')
-
-            if (e + 1) % 5 == 0:  # save weights every epochs
-                self.net.save(self.path_out+'net_weights_epoch' + str(e + 1) + '.h5')
+            
+            if self.save_every is not None:
+                if (e + 1) % self.save_every == 0:  # save weights every epochs
+                    self.net.save(self.path_out+'net_weights_epoch' + str(e + 1) + '.h5')
 
         self.display("Model took %0.2f seconds to train" % np.sum(process_time))
         self.net.save(self.path_out+'net_weights_FINAL.h5')
