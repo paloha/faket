@@ -17,7 +17,7 @@
 #  we use PyTorch=1.10 which requires CUDA 11.3.
 ####################################################################
 
-name: faket
+name: faket2
 dependencies:
   - python=3.9
   - cudatoolkit=11.3                                    # GPU
@@ -44,3 +44,6 @@ dependencies:
     - openpyxl>=3.0.3                                   # DF
     - radontea>=0.4.9                                   # Faket
     - git+https://gitlab.com/paloha/gpuMultiprocessing  # Faket
+    - seaborn>=0.11.2                                   # SHREC eval
+    - scikit-plot>=0.3.7                                # SHREC eval
+    - pycm>=3.4                                         # SHREC eval
