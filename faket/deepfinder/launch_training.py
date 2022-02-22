@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import json
+from pathlib import Path
 
 
 
@@ -52,10 +53,6 @@ if not len(args.training_tomogram_ids) == len(args.training_tomograms):
 num_epochs = args.num_epochs[0]
 out_path = args.out_path
 
-
-# set GPU id according to config
-#os.environ['CUDA_VISIBLE_DEVICES'] = gpu_no
-
 # create out_path if it does not exist
 if os.path.exists(out_path)==False:
         os.makedirs(out_path) 
@@ -65,17 +62,14 @@ path_data = []
 path_target = []
 path_particle_locations = []
 for id, tomo in zip(args.training_tomogram_ids, args.training_tomograms):
-    path_reconstruction = args.training_tomo_path + 'model_' + \
-            id + '/faket/reconstruction_' + tomo + '.mrc'
-    path_data.append(path_reconstruction)
+    path_reconstruction = Path(f'{args.training_tomo_path}model_{id}/faket/reconstruction_{tomo}.mrc')
+    path_data.append(str(path_reconstruction))
     
-    path_class_mask = args.training_tomo_path + 'model_' + \
-            id + '/faket/class_mask.mrc'
-    path_target.append(path_class_mask)
+    path_class_mask = Path(f'{args.training_tomo_path}model_{id}/faket/class_mask.mrc')
+    path_target.append(str(path_class_mask))
     
-    path_part_loc = args.training_tomo_path + 'model_' + \
-            id + '/particle_locations.txt'
-    path_particle_locations.append(path_part_loc)
+    path_part_loc = Path(f'{args.training_tomo_path}model_{id}/particle_locations.txt')
+    path_particle_locations.append(str(path_part_loc))
 
     
 # create objl_train according to path_data
@@ -92,7 +86,7 @@ dim_in = 56 # patch size
 
 # Initialize training task:
 trainer = Train(Ncl=Nclass, dim_in=dim_in)
-trainer.path_out         = out_path # output path
+trainer.path_out         = Path(out_path) # output path
 trainer.h5_dset_name     = 'dataset' # if training data is stored as h5, you can specify the h5 dataset
 trainer.batch_size       = 25
 trainer.save_every       = args.save_every[0]
@@ -116,5 +110,5 @@ summary = {
     "num_epochs" : args.num_epochs[0]
 }
 
-with open(out_path + 'summary.json', 'w') as fl:
+with open(str(out_path / 'summary.json'), 'w') as fl:
             json.dump(summary, fl, indent=4)

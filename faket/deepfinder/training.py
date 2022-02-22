@@ -338,17 +338,17 @@ class Train(core.DeepFinder):
             history = {'loss': hist_loss_train, 'acc': hist_acc_train, 'val_loss': hist_loss_valid,
                        'val_acc': hist_acc_valid, 'val_f1': hist_f1, 'val_recall': hist_recall,
                        'val_precision': hist_precision}
-            core.save_history(history, self.path_out+'net_train_history.h5')
-            core.plot_history(history, self.path_out+'net_train_history_plot.png')
+            core.save_history(history, str(self.path_out / 'net_train_history.h5'))
+            core.plot_history(history, str(self.path_out / 'net_train_history_plot.png'))
 
             self.display('=============================================================')
             
             if self.save_every is not None:
                 if (e + 1) % self.save_every == 0:  # save weights every epochs
-                    self.net.save(self.path_out+'net_weights_epoch' + str(e + 1) + '.h5')
+                    self.net.save(str(self.path_out / f'net_weights_epoch{str(e + 1)}.h5'))
 
         self.display("Model took %0.2f seconds to train" % np.sum(process_time))
-        self.net.save(self.path_out+'net_weights_FINAL.h5')
+        self.net.save(str(self.path_out / 'net_weights_FINAL.h5'))
 
     def check_arguments(self, path_data, path_target, objlist_train, objlist_valid):
         self.is_list(path_data, 'path_data')

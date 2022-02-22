@@ -1,13 +1,29 @@
 import os
 import sys
-import faket.deepfinder.utils.objl as ol
+import argparse
+from pathlib import Path
+import utils.objl as ol
 
 
-def launch_evaluation(test_tomogram, test_tomo_idx, num_epochs, label_map_path, out_path):
-    
-    part_file_name = f'{out_path}tomo{test_tomo_idx}_{test_tomogram}_2021_{num_epochs}epoch'
+#def launch_evaluation(test_tomogram, test_tomo_idx, num_epochs, label_map_path, out_path):
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test_tomogram", type=str, 
+                        help="tomogram to be segmented", default="baseline")
+    parser.add_argument("--test_tomo_idx", type=str, 
+                        help="folder index of test tomogram")
+    parser.add_argument("--num_epochs", type=str, 
+                        help="number of epochs deep finder was trained")
+    parser.add_argument("--label_map_path", type=str, 
+                        help="path to the folder of the label map that results from segmentation")
+    parser.add_argument("--out_path", type=str, 
+                        help="out path for the xml files resulting from clustering")
+    args = parser.parse_args()
+
+    part_file_name = f'{args.out_path}tomo{args.test_tomo_idx}_{args.test_tomogram}_2021_{args.num_epochs}epoch'
     objl = ol.read_xml(f'{part_file_name}_bin1_objlist_thr.xml')
-    particle_list = f'{out_path}particle_locations_tomo_{test_tomogram}_.txt'
+    particle_list = f'{args.out_path}particle_locations_tomo_{args.test_tomogram}_.txt'
     
     # convert the predicted object list into a text file, as needed by the SHREC'21 evaluation script:
        
@@ -26,10 +42,11 @@ def launch_evaluation(test_tomogram, test_tomo_idx, num_epochs, label_map_path, 
             file.write(f'{class_name[lbl]} {x} {y} {z}\n')
     
     interpreter = 'python'
-    eval_script = 'data/shrec2021_extended_dataset/misc/eval.py'
+    eval_script = Path('data/shrec2021_extended_dataset/misc/eval.py')
+    test_tomogram_folder = Path('data/shrec2021_extended_dataset/model_9/faket/')
     args = [
         f'-s {particle_list}',
-        f'-t data/shrec2021_extended_dataset/model_9/faket/',
+        f'-t {test_tomogram_folder}',
         f'-o {part_file_name}_bin1_2021.txt'
     ]
     os.system(f'{interpreter} {eval_script} {" ".join(args)}')

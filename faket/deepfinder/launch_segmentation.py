@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+from pathlib import Path
 from segmentation import Segment
 import utils.common as cm
 import utils.smap as sm
@@ -29,17 +30,20 @@ os.makedirs(path, exist_ok=True)
 Nclass = 16
 patch_size = 160 # must be multiple of 4
 
-path_tomo = args.test_tomo_path + 'model_' + str(args.num_epochs) +\
-        '/faket/reconstruction_' + args.test_tomogram + '.mrc'
+path_tomo_args = [f'{args.test_tomo_path}', 
+                  f'model_{args.test_tomo_idx}/faket/reconstruction_',
+                  f'{test_tomo}.mrc']
+
+path_tomo = Path(''.join(path_tomo_args))
     
 # Load data:
-tomo = cm.read_array(path_tomo)
+tomo = cm.read_array(str(path_tomo))
 
 # Input parameters:
-path_weights = args.DF_weights_path + '/net_weights_epoch'+ str(num_epochs) +'.h5'
+path_weights = Path(f'{args.DF_weights_path}/net_weights_epoch{num_epochs}.h5')
 
 # Initialize segmentation task:
-seg  = Segment(Ncl=Nclass, path_weights=path_weights, patch_size=patch_size)
+seg  = Segment(Ncl=Nclass, path_weights=str(path_weights), patch_size=patch_size)
 
 # Segment tomogram:
 scoremaps = seg.launch(tomo)
@@ -52,5 +56,7 @@ scoremapsB = sm.bin(scoremaps)
 labelmapB  = sm.to_labelmap(scoremapsB)
 
 # Save labelmaps:
-cm.write_array(labelmap , path + '/tomo9_'+test_tomo+'_2021_'+ str(num_epochs)  +'epochs_labelmap.mrc')
-cm.write_array(labelmapB, path + '/tomo9_'+test_tomo+'_2021_'+ str(num_epochs)  +'epochs_bin1_labelmap.mrc')
+labelmap_file_name = Path(f'{path}/tomo9_{test_tomo}_2021_{num_epochs}epochs_labelmap.mrc')
+labelmapB_file_name = Path(f'{path}/tomo9_{test_tomo}_2021_{num_epochs}epochs_bin1_labelmap.mrc')
+cm.write_array(labelmap , str(labelmap_file_name))
+cm.write_array(labelmapB, str(labelmapB_file_name))
