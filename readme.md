@@ -11,7 +11,7 @@ Re-create the Conda environment using:
 
 ```
 cd faket
-conda create -f environment.yml
+conda env create -f environment.yml
 conda activate faket
 ```
 

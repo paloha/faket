@@ -17,7 +17,7 @@
 #  we use PyTorch=1.10 which requires CUDA 11.3.
 ####################################################################
 
-name: faket2
+name: faket
 dependencies:
   - python=3.9
   - cudatoolkit=11.3                                    # GPU
