@@ -110,11 +110,11 @@ def vol_to_valid(data_folder, N, fname, z_valid, out_fname=None):
     as a mrc file with '_valid' suffix.
     """
     print(f'# Slicing {fname} {N}')
-    square = load_mrc(os.path.join(data_folder, N, f'{fname}.mrc'))
+    square = load_mrc(os.path.join(data_folder, str(N), f'{fname}.mrc'))
     assert square.shape[0] == square.shape[1], 'Not square'
     valid = slice_to_valid(square, *z_valid)
     out_fname = out_fname or f'{fname}_valid.mrc'
-    save_mrc(valid.astype(np.float32), os.path.join(data_folder, N, out_fname), overwrite=True)
+    save_mrc(valid.astype(np.float32), os.path.join(data_folder, str(N), out_fname), overwrite=True)
     print(f'-- DONE slicing {fname} {N} to valid range and saving as mrc file.')
     
     
