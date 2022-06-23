@@ -15,6 +15,8 @@ from tifffile import TIFF, TiffWriter
 import torch
 import torch.multiprocessing as mp
 from tqdm import tqdm
+import numpy as np
+import random
 
 # Changed by faket to fix imports in current project structure
 srgb_profile = (Path(__file__).resolve().parent / 'sRGB Profile.icc').read_bytes()
@@ -204,7 +206,14 @@ def main():
 
     args = p.parse_args()
     
-
+    # Reproducibility - added by FakET
+    # run this script with PYTHONHASHSEED=0 python ...
+    random.seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(args.random_seed)
+    
     # Implementing support for mrc file input
     # We normalize the data to interval [0, 1] as is expected by 
     # the NST. We do it on the whole mrc file to keep the relationships 

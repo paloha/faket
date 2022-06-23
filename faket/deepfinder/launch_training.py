@@ -13,7 +13,7 @@ parser.add_argument("--training_tomogram_ids", nargs='*',
                     choices=['0','1','2','3','4','5','6','7','8'],
                     type=str, help="ids of tomogram within shrec based data set to be used for training of DF")
 parser.add_argument("--training_tomograms", nargs='*', type=str,
-                    choices=['baseline', 'content', 'noisy', 'styled', 'noiseless'],
+                    choices=['baseline', 'content', 'noisy', 'styled', 'noiseless', 'volnoisy'],
                     help="type of tomograms to be used for training of DF")
 parser.add_argument("--num_epochs", nargs=1, type=int, help="number of epochs to train DF")
 parser.add_argument("--out_path", type=str, help="location where to store the weights of DF")
@@ -40,10 +40,7 @@ from training import Train
 import utils.objl as ol
 import produce_objl
 
-
-
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 
@@ -61,14 +58,14 @@ if os.path.exists(out_path)==False:
 path_data = []
 path_target = []
 path_particle_locations = []
-for id, tomo in zip(args.training_tomogram_ids, args.training_tomograms):
-    path_reconstruction = Path(f'{args.training_tomo_path}model_{id}/faket/reconstruction_{tomo}.mrc')
+for N, tomo in zip(args.training_tomogram_ids, args.training_tomograms):
+    path_reconstruction = Path(f'{args.training_tomo_path}model_{N}/faket/reconstruction_{tomo}.mrc')
     path_data.append(str(path_reconstruction))
     
-    path_class_mask = Path(f'{args.training_tomo_path}model_{id}/faket/class_mask.mrc')
+    path_class_mask = Path(f'{args.training_tomo_path}model_{N}/faket/class_mask.mrc')
     path_target.append(str(path_class_mask))
     
-    path_part_loc = Path(f'{args.training_tomo_path}model_{id}/particle_locations.txt')
+    path_part_loc = Path(f'{args.training_tomo_path}model_{N}/particle_locations.txt')
     path_particle_locations.append(str(path_part_loc))
 
     
@@ -99,7 +96,19 @@ trainer.class_weights = None # keras syntax: class_weights={0:1., 1:10.} every i
 
 # Use following line if you want to resume a previous training session:
 if args.continue_training_path is not None:
-    trainer.net.load_weights(args.continue_training_path)
+    from os.path import splitext, basename
+    from losses import tversky_loss
+    from tensorflow.keras.models import load_model
+    trainer.net = load_model(args.continue_training_path,
+                             custom_objects={'tversky_loss': tversky_loss})
+    
+    # Get the last epoch number from the net_weights_epochN.h5 filename
+    trainer.restart_from_epoch = \
+        int(splitext(basename(args.continue_training_path))[0].split('epoch')[1]) + 1
+    
+    # Original DeepFinder code loaded just weights, which is incorrect
+    # because it does not load the optimizer state.
+    # trainer.net.load_weights(args.continue_training_path)
 
 # Finally, launch the training procedure:
 trainer.launch(path_data, path_target, objl_train, objl_valid)

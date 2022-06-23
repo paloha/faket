@@ -8,6 +8,10 @@ import h5py
 import numpy as np
 import time
 
+import os
+import sys
+from os.path import join as pj
+
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
 import tensorflow.keras.backend as K
@@ -173,6 +177,8 @@ class Train(core.DeepFinder):
         
         #save regularly every k'th epoch
         self.save_every = None
+        
+        self.restart_from_epoch = None
 
         self.check_attributes()
 
@@ -236,11 +242,42 @@ class Train(core.DeepFinder):
         """
         self.check_attributes()
         self.check_arguments(path_data, path_target, objlist_train, objlist_valid)
-
-
-        # Build network (not in constructor, else not possible to init model with weights from previous train round):
-        self.net.compile(optimizer=self.optimizer, loss=self.loss, metrics=['accuracy'])
-
+        
+        # Redirecting stdout and stderr to a file to have logs stored on disk
+        outpath = pj(self.path_out, 'logs', 'training', f'{os.getpid()}.out')
+        errpath = pj(self.path_out, 'logs', 'training', f'{os.getpid()}.err')
+        os.makedirs(os.path.dirname(outpath), exist_ok=True)
+        os.makedirs(os.path.dirname(errpath), exist_ok=True)
+        sys.stdout = open(outpath, "a+")
+        sys.stderr = open(errpath, "a+")
+        
+        if self.restart_from_epoch is None:
+            self.display('Compiling the network ...')
+            # Build network (not in constructor, else not possible to init model with weights from previous train round):
+            self.net.compile(optimizer=self.optimizer, loss=self.loss, metrics=['accuracy'])
+            self.restart_from_epoch = 0
+            # Declare lists for storing training statistics:
+            hist_loss_train = []
+            hist_acc_train  = []
+            hist_loss_valid = []
+            hist_acc_valid  = []
+            hist_f1         = []
+            hist_recall     = []
+            hist_precision  = []
+            process_time    = []
+        else:
+            self.display(f'Restarting training from epoch {self.restart_from_epoch}.')
+            # Load lists with previous history of training statistics:
+            hist = core.read_history(str(self.path_out / 'net_train_history.h5'))
+            hist_loss_train = hist['loss'].tolist()
+            hist_acc_train  = hist['acc'].tolist()
+            hist_loss_valid = hist['val_loss'].tolist()
+            hist_acc_valid  = hist['val_acc'].tolist()
+            hist_f1         = hist['val_f1'].tolist()
+            hist_recall     = hist['val_recall'].tolist()
+            hist_precision  = hist['val_precision'].tolist()
+            process_time    = []
+            
         # Load whole dataset:
         if self.flag_direct_read == False:
             self.display('Loading dataset ...')
@@ -248,18 +285,8 @@ class Train(core.DeepFinder):
 
         self.display('Launch training ...')
 
-        # Declare lists for storing training statistics:
-        hist_loss_train = []
-        hist_acc_train  = []
-        hist_loss_valid = []
-        hist_acc_valid  = []
-        hist_f1         = []
-        hist_recall     = []
-        hist_precision  = []
-        process_time    = []
-
         # Training loop:
-        for e in range(self.epochs):
+        for e in range(self.restart_from_epoch - 1, self.epochs):
             # TRAINING:
             start = time.time()
             list_loss_train = []
@@ -299,6 +326,8 @@ class Train(core.DeepFinder):
             hist_loss_train.append(list_loss_train)
             hist_acc_train.append(list_acc_train)
 
+            
+            valid_start = time.time()
             # VALIDATION (compute statistics to monitor training):
             list_loss_valid = []
             list_acc_valid  = []
@@ -330,8 +359,8 @@ class Train(core.DeepFinder):
             end = time.time()
             process_time.append(end - start)
             self.display('-------------------------------------------------------------')
-            self.display('EPOCH %d/%d - valid loss: %0.3f - valid acc: %0.3f - %0.2fsec' % (
-                e + 1, self.epochs, loss_val[0], loss_val[1], end - start))
+            self.display('EPOCH %d/%d - valid loss: %0.3f - valid acc: %0.3f - %0.2fsec (from which %0.2fsec for validation)' % (
+                e + 1, self.epochs, loss_val[0], loss_val[1], end - start, end - valid_start))
 
 
             # Save and plot training history:
@@ -347,7 +376,7 @@ class Train(core.DeepFinder):
                 if (e + 1) % self.save_every == 0:  # save weights every epochs
                     self.net.save(str(self.path_out / f'net_weights_epoch{str(e + 1)}.h5'))
 
-        self.display("Model took %0.2f seconds to train" % np.sum(process_time))
+        self.display("Model took %0.2f seconds to train since last restart." % np.sum(process_time))
         self.net.save(str(self.path_out / 'net_weights_FINAL.h5'))
 
     def check_arguments(self, path_data, path_target, objlist_train, objlist_valid):

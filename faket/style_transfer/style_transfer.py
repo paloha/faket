@@ -279,11 +279,11 @@ class StyleTransfer:
         # The default content and style layers in gatys Gatys et al. (2015)
         # were [22] and [1, 6, 11, 20, 29] respectively. The following
         # changes were made by Faket
-        self.content_layers = [6, 11, 13]
+        self.content_layers = [11]
         self.style_layers = [1, 6, 11, 20, 29] 
         
         # The weighting of the content layers introduced by Faket
-        content_weights = [2, 96, 2]  # Added by faket
+        content_weights = [100]  # Added by faket
         weight_sum = sum(abs(w) for w in content_weights)
         self.content_weights = [w / weight_sum for w in content_weights]
 
