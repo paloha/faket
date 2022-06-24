@@ -1,10 +1,20 @@
-import sys
 import os
-import argparse
+import sys
 import json
+import random
+import argparse
+import numpy as np
+import produce_objl
+import tensorflow as tf
+import utils.objl as ol
 from pathlib import Path
+from training import Train
+from os.path import join as pj
+from os.path import splitext, basename
 
-
+# Tensorflow specific env variables
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 # parse path to config
 parser = argparse.ArgumentParser()
@@ -26,22 +36,10 @@ parser.add_argument("--continue_training_path", type=str, default=None,
                     help="path to DF weights for continuing training")
 args = parser.parse_args()
 
-
-
-import numpy as np
-import random
-import tensorflow as tf
-
+# Set random seeds
 np.random.seed(args.seed1[0])
 tf.random.set_seed(args.seed2[0])
 random.seed(args.seed1[0])
-
-from training import Train
-import utils.objl as ol
-import produce_objl
-
-os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 
 if not len(args.training_tomogram_ids) == len(args.training_tomograms):
@@ -53,7 +51,7 @@ out_path = args.out_path
 # create out_path if it does not exist
 if os.path.exists(out_path)==False:
         os.makedirs(out_path) 
-
+        
 # create path_data and path target
 path_data = []
 path_target = []
@@ -68,16 +66,6 @@ for N, tomo in zip(args.training_tomogram_ids, args.training_tomograms):
     path_part_loc = Path(f'{args.training_tomo_path}model_{N}/particle_locations.txt')
     path_particle_locations.append(str(path_part_loc))
 
-    
-# create objl_train according to path_data
-objl_train = produce_objl.create_objl(path_particle_locations)
-
-
-# create objl_valid as in the original Deep-Finder repo
-objl_valid = produce_objl.create_objl([path_particle_locations[-1]], int(args.training_tomogram_ids[-1][0]))
-
-
-#Nclass = 13
 Nclass = 16
 dim_in = 56 # patch size
 
@@ -94,9 +82,33 @@ trainer.flag_batch_bootstrap = True
 trainer.Lrnd             = 13 # random shifts when sampling patches (data augmentation)
 trainer.class_weights = None # keras syntax: class_weights={0:1., 1:10.} every instance of class 1 is treated as 10 instances of class 0
 
+# write summary of training to out_path
+summary = {
+    "training_tomograms" : path_data,
+    "num_epochs" : args.num_epochs[0],
+    "seed1": args.seed1[0],
+    "seed2": args.seed2[0],
+    "Nclass": Nclass,
+    "dim_in": dim_in,
+    "batch_size": trainer.batch_size,
+    "Nvalid": trainer.Nvalid,
+    "flag_direct_read": trainer.flag_direct_read,
+    "flag_batch_bootstrap": trainer.flag_batch_bootstrap,
+    "Lrnd": trainer.Lrnd,
+    "class_weights": trainer.class_weights,
+    }
+
+with open(pj(out_path, 'training_summary.json'), 'w') as fl:
+    json.dump(summary, fl, indent=4)
+
+# create objl_train according to path_data
+objl_train = produce_objl.create_objl(path_particle_locations)
+
+# create objl_valid as in the original Deep-Finder repo
+objl_valid = produce_objl.create_objl([path_particle_locations[-1]], int(args.training_tomogram_ids[-1][0]))
+    
 # Use following line if you want to resume a previous training session:
 if args.continue_training_path is not None:
-    from os.path import splitext, basename
     from losses import tversky_loss
     from tensorflow.keras.models import load_model
     trainer.net = load_model(args.continue_training_path,
@@ -112,12 +124,3 @@ if args.continue_training_path is not None:
 
 # Finally, launch the training procedure:
 trainer.launch(path_data, path_target, objl_train, objl_valid)
-
-# write summary of training to out_path
-summary = {
-    "training_tomograms" : path_data,
-    "num_epochs" : args.num_epochs[0]
-}
-
-with open(str(out_path / 'summary.json'), 'w') as fl:
-            json.dump(summary, fl, indent=4)
