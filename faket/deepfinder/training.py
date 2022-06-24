@@ -4,29 +4,21 @@
 # Copyright (C) Inria,  Emmanuel Moebel, Charles Kervrann, All Rights Reserved, 2015-2021, v1.0
 # License: GPL v3.0. See <https://www.gnu.org/licenses/>
 # =============================================================================================
-import h5py
-import numpy as np
-import time
 
 import os
 import sys
+import h5py
+import time
+import models
+import losses
+import numpy as np
+from utils import core
+from utils import common as cm
 from os.path import join as pj
-
+import tensorflow.keras.backend as K
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
-import tensorflow.keras.backend as K
-
 from sklearn.metrics import precision_recall_fscore_support
-
-#from . import models
-import models
-#from . import losses
-import losses
-#from .utils import core
-from utils import core
-#from .utils import common as cm
-from utils import common as cm
-
 
 
 class TargetBuilder(core.DeepFinder):
@@ -144,7 +136,7 @@ class TargetBuilder(core.DeepFinder):
         return target_array
 
 
-# TODO: add method for resuming training. It should load existing weights and train_history. So when restarting, the plot curves show prececedent epochs
+# TODO: add method for resuming training. It should load existing weights and train_history. So when restarting, the plot curves show prececedent epochs - done by FakET
 class Train(core.DeepFinder):
     def __init__(self, Ncl, dim_in):
         core.DeepFinder.__init__(self)
@@ -255,7 +247,7 @@ class Train(core.DeepFinder):
             self.display('Compiling the network ...')
             # Build network (not in constructor, else not possible to init model with weights from previous train round):
             self.net.compile(optimizer=self.optimizer, loss=self.loss, metrics=['accuracy'])
-            self.restart_from_epoch = 0
+            self.restart_from_epoch = 1
             # Declare lists for storing training statistics:
             hist_loss_train = []
             hist_acc_train  = []
@@ -298,7 +290,11 @@ class Train(core.DeepFinder):
             #n_iterations = self.steps_per_epoch
             n_iterations = int(len(objlist_train) / self.batch_size)
 
+            # Timing data generation
+            generating_data_time = 0
+            
             for it in range(n_iterations):
+                t0 = time.time()
                 if (it+1)*self.batch_size < len(idxs):
                     batch_idxs = idxs[it*self.batch_size: (it+1)*self.batch_size]
                 else:
@@ -315,7 +311,9 @@ class Train(core.DeepFinder):
                     sample_weight = self.sample_weights[idx_list]
                 else:
                     sample_weight = None
-
+                    
+                generating_data_time += time.time() - t0
+                
                 loss_train = self.net.train_on_batch(batch_data, batch_target,
                                                      class_weight=self.class_weight,
                                                      sample_weight=sample_weight)
@@ -323,6 +321,7 @@ class Train(core.DeepFinder):
                 self.display('epoch %d/%d - it %d/%d - loss: %0.3f - acc: %0.3f' % (e + 1, self.epochs, it + 1, n_iterations, loss_train[0], loss_train[1]))
                 list_loss_train.append(loss_train[0])
                 list_acc_train.append(loss_train[1])
+                
             hist_loss_train.append(list_loss_train)
             hist_acc_train.append(list_acc_train)
 
@@ -359,10 +358,13 @@ class Train(core.DeepFinder):
             end = time.time()
             process_time.append(end - start)
             self.display('-------------------------------------------------------------')
-            self.display('EPOCH %d/%d - valid loss: %0.3f - valid acc: %0.3f - %0.2fsec (from which %0.2fsec for validation)' % (
-                e + 1, self.epochs, loss_val[0], loss_val[1], end - start, end - valid_start))
-
-
+            self.display((
+                f'EPOCH {e + 1}/{self.epochs} - valid loss: {loss_val[0]:.3f} - '
+                f'valid acc: {loss_val[1]:.3f} - {end - start:.2f}sec '
+                f'(from which {generatig_data_time:.2f}sec generating data & '
+                f'{end - valid_start:.2f}sec validating)'
+            ))
+            
             # Save and plot training history:
             history = {'loss': hist_loss_train, 'acc': hist_acc_train, 'val_loss': hist_loss_valid,
                        'val_acc': hist_acc_valid, 'val_f1': hist_f1, 'val_recall': hist_recall,
