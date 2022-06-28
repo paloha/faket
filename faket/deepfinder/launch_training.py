@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import random
 import argparse
 import numpy as np

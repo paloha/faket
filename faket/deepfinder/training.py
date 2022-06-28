@@ -254,7 +254,7 @@ class Train(core.DeepFinder):
             "Lrnd": self.Lrnd,
             "class_weights": self.class_weights,
             }
-        with open(pj(logpath, f'{logname}.json'), 'w+') as fsum:
+        with open(pj(logpath, f'{logname}.json'), 'w') as fsum:
             json.dump(summary, fsum, indent=4)
 
         # Redirect stdout to log

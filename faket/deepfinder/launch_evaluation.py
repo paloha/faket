@@ -28,8 +28,9 @@ if __name__ == '__main__':
     # Path to the txt file containing the predicted particle locations (for SHREC eval script)
     particle_list_fname = f'{identifier_fname}_particles.txt'
     
-    # Desired path of the evaluation output txt file (evaluated using SHREC eval script)
-    out_fname = f'{identifier_fname}_evaluation.txt'
+    # Desired destination of the evaluation files (evaluated using SHREC eval script)
+    eval_folder = pj(args.out_path, f'{identifier_fname}_evaluation')
+    os.makedirs(eval_folder, exist_ok=True)
 
     # Map for conversion of the predicted object list into a text file, as needed by the SHREC'21 evaluation script:
     class_name = {
@@ -48,12 +49,14 @@ if __name__ == '__main__':
             file.write(f'{class_name[lbl]} {x} {y} {z}\n')
     
     # Run the original SHREC'21 evaluation script
-    interpreter = 'python'
-    eval_script = pj('data', 'shrec2021_extended_dataset', 'misc', 'eval.py')
+    interpreter = 'python3'
+    eval_script = pj('faket', 'shrec2021', 'eval.py')
     test_tomogram_folder = pj('data', 'shrec2021_extended_dataset', 'model_9', 'faket')
     args = [
         f'-s {pj(args.out_path, particle_list_fname)}',  # Predicted
         f'-t {test_tomogram_folder}',  #  Ground truth
-        f'-o {pj(args.out_path, out_fname)}'  # Output
+        f'-o {eval_folder}',  # Output
+        '--skip_4v94', '--skip_vesicles',
+        '--confusion',  # Uncomment if you want png confmats
     ]
     os.system(f'{interpreter} {eval_script} {" ".join(args)}')
