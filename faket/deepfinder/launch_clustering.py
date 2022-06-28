@@ -1,14 +1,15 @@
-import sys
-import argparse
 import os
-from pathlib import Path
-
-from clustering import Cluster
-import utils.common as cm
+import sys
+import json
+import argparse
 import utils.objl as ol
-
+import utils.common as cm
+from clustering import Cluster
+from os.path import join as pj
 
 if __name__ == '__main__':
+    
+    # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_tomogram", type=str, 
                         help="tomogram to be segmented", default="baseline")
@@ -22,30 +23,50 @@ if __name__ == '__main__':
                         help="out path for the xml files resulting from clustering")
     args = parser.parse_args()
 
-    # Input parameters:
-    file_name_args = [f'{args.label_map_path}/tomo',
-                      f'{args.test_tomo_idx}_',
-                      f'{args.test_tomogram}_2021_',
-                      f'{args.num_epochs}epochs', 
-                      f'_bin1_labelmap.mrc']
-    path_labelmap = Path(''.join(file_name_args))
+    identifier_fname = f'epoch{int(args.num_epochs):03d}_2021_model_{args.test_tomo_idx}_{args.test_tomogram}_bin2'
     
-    #path_labelmap = Path(f'{part_file_name}_bin1_labelmap.mrc')
+    # Input file name
+    labelmap_path = pj(args.label_map_path, f'{identifier_fname}_labelmap.mrc')
+    
+    # Output file names
+    raw_path = pj(args.out_path, f'{identifier_fname}_objlist_thr.xml')
+    thr_path = pj(args.out_path, f'{identifier_fname}_objlist_raw.xml')
     cluster_radius = 5         # should correspond to average radius of target objects (in voxels)
     cluster_size_threshold = 1 # found objects smaller than this threshold are immediately discarded
-
-    # Output parameter:
-    part_out_file_name_args = [f'{args.out_path}/tomo',
-                               f'{str(args.test_tomo_idx)}_',
-                               f'{args.test_tomogram}_2021_',
-                               f'{args.num_epochs}epoch_bin1_objlists']
-    out_file_name_thr = Path(''.join(part_out_file_name_args) + '_thr.xml')
-    out_file_name_raw = Path(''.join(part_out_file_name_args) + '_raw.xml')
     
+    # As macromolecules have different size, each class has its own size threshold (for removal).
+    # The thresholds have been determined on the validation set.
+    lbl_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    thr_list = [1000, 1, 1, 1, 1, 20, 20, 20, 1, 1, 1, 1, 1, 1000, 1]
 
     # Load data:
-    labelmapB = cm.read_array(str(path_labelmap))
+    labelmapB = cm.read_array(labelmap_path)
 
+    # Logging ###########################################
+    logpath = pj(args.out_path, 'logs', 'clustering')
+    logname = identifier_fname
+    os.makedirs(logpath, exist_ok=True)
+
+    # Creating summary in log
+    summary = {
+        "labelmap_path": labelmap_path, 
+        "cluster_radius" : cluster_radius, 
+        "cluster_size_threshold": cluster_size_threshold, 
+        "class_thresholds": dict(zip(lbl_list, thr_list))}
+    with open(pj(logpath, f'{logname}.json'), 'w') as fsum:
+        json.dump(summary, fsum, indent=4)
+
+    # Redirect stdout to log
+    outlog = pj(logpath, f'{logname}.out')
+    fout = open(outlog, 'w')
+    sys.stdout = fout
+
+    # Redirect stderr to log
+    errlog = pj(logpath, f'{logname}.err')
+    ferr = open(errlog, 'w')
+    sys.stderr = ferr
+    #####################################################
+    
     # Initialize clustering task:
     clust = Cluster(clustRadius=5)
     clust.sizeThr = cluster_size_threshold
@@ -58,15 +79,16 @@ if __name__ == '__main__':
     # order to compare to ground truth:
     objlist = ol.scale_coord(objlist, 2)
 
-    # Then, we filter out particles that are too small, 
-    # considered as false positives. As macromolecules have different
-    # size, each class has its own size threshold.
-    # The thresholds have been determined on the validation set.
-    lbl_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    thr_list = [1000, 1, 1, 1, 1, 20, 20, 20, 1, 1, 1, 1, 1, 1000, 1 ]
-
+    # Filtering out particles (false positives) that are too small (based on desired thresholds)
     objlist_thr = ol.above_thr_per_class(objlist, lbl_list, thr_list)
 
     # Save object lists:
-    ol.write_xml(objlist, str(out_file_name_raw))
-    ol.write_xml(objlist_thr, str(out_file_name_thr))
+    ol.write_xml(objlist, raw_path)
+    ol.write_xml(objlist_thr, thr_path)
+    
+    # Close log files & remove empty log files if any
+    fout.close()
+    ferr.close()
+    for log in [outlog, errlog]:
+        if os.path.isfile(log) and os.path.getsize(log) == 0:
+            os.remove(log)

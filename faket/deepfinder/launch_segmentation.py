@@ -1,62 +1,90 @@
 import os
 import sys
+import json
 import argparse
-from pathlib import Path
-from segmentation import Segment
-import utils.common as cm
 import utils.smap as sm
+import utils.common as cm
+from os.path import join as pj
+from segmentation import Segment
 
-# parse path to config
-parser = argparse.ArgumentParser()
-parser.add_argument("--test_tomo_path", type=str, help="path to tomograms to be segmented")
-parser.add_argument("--test_tomogram", type=str, help="tomogram to be segmented", default="baseline")
-parser.add_argument("--test_tomo_idx", type=int, help="folder index of test tomogram")
-parser.add_argument("--num_epochs", type=str, help="number of epochs deep finder was trained")
-parser.add_argument("--DF_weights_path", type=str, help="path to trained weights of deep finder")
-parser.add_argument("--out_path", type=str, help="out path for the mrc file resulting from segmentation")
-args = parser.parse_args()
-
-model = args.DF_weights_path
-num_epochs = args.num_epochs
-test_tomo = args.test_tomogram
-
-os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-
-# create output folders if they dont exist already
-path = args.out_path
-os.makedirs(path, exist_ok=True)
-
-Nclass = 16
-patch_size = 160 # must be multiple of 4
-
-path_tomo_args = [f'{args.test_tomo_path}', 
-                  f'model_{args.test_tomo_idx}/faket/reconstruction_',
-                  f'{test_tomo}.mrc']
-
-path_tomo = Path(''.join(path_tomo_args))
+if __name__ == '__main__':
     
-# Load data:
-tomo = cm.read_array(str(path_tomo))
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test_tomo_path", type=str, help="path to tomograms to be segmented")
+    parser.add_argument("--test_tomogram", type=str, help="tomogram to be segmented", default="baseline")
+    parser.add_argument("--test_tomo_idx", type=int, help="folder index of test tomogram")
+    parser.add_argument("--num_epochs", type=str, help="number of epochs deep finder was trained")
+    parser.add_argument("--DF_weights_path", type=str, help="path to trained weights of deep finder")
+    parser.add_argument("--out_path", type=str, help="out path for the mrc file resulting from segmentation")
+    args = parser.parse_args()
 
-# Input parameters:
-path_weights = Path(f'{args.DF_weights_path}/net_weights_epoch{num_epochs}.h5')
+    # Tensorflow specific env variables
+    os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
-# Initialize segmentation task:
-seg  = Segment(Ncl=Nclass, path_weights=str(path_weights), patch_size=patch_size)
+    # Create output folders if they dont exist already
+    os.makedirs(args.out_path, exist_ok=True)
 
-# Segment tomogram:
-scoremaps = seg.launch(tomo)
+    # Output file names
+    identifier_fname = f'epoch{int(args.num_epochs):03d}_2021_model_{args.test_tomo_idx}_{args.test_tomogram}'
+    labelmap_file_name = pj(args.out_path, f'{identifier_fname}_labelmap.mrc')
+    labelmapB_file_name = pj(args.out_path, f'{identifier_fname}_bin2_labelmap.mrc')
 
-# Get labelmap from scoremaps:
-labelmap  = sm.to_labelmap(scoremaps)
+    Nclass = 16
+    patch_size = 160 # must be multiple of 4
 
-# Bin labelmap for the clustering step (saves up computation time):
-scoremapsB = sm.bin(scoremaps)
-labelmapB  = sm.to_labelmap(scoremapsB)
+    # Load data:
+    path_tomo = pj(args.test_tomo_path, f'model_{args.test_tomo_idx}', 
+                  'faket', f'reconstruction_{args.test_tomogram}.mrc')
+    tomo = cm.read_array(str(path_tomo))
 
-# Save labelmaps:
-labelmap_file_name = Path(f'{path}/tomo9_{test_tomo}_2021_{num_epochs}epochs_labelmap.mrc')
-labelmapB_file_name = Path(f'{path}/tomo9_{test_tomo}_2021_{num_epochs}epochs_bin1_labelmap.mrc')
-cm.write_array(labelmap , str(labelmap_file_name))
-cm.write_array(labelmapB, str(labelmapB_file_name))
+    # Model weights:
+    path_weights = pj(f'{args.DF_weights_path}', f'epoch{int(args.num_epochs):03d}_weights.h5')
+
+    # Logging ###########################################
+    logpath = pj(args.out_path, 'logs', 'segmentation')
+    logname = identifier_fname
+    os.makedirs(logpath, exist_ok=True)
+
+    # Creating summary in log
+    summary = {
+        "tomogram" : path_tomo, "model": path_weights, 
+        "Nclass": Nclass, "patch_size": patch_size}
+    with open(pj(logpath, f'{logname}.json'), 'w') as fsum:
+        json.dump(summary, fsum, indent=4)
+
+    # Redirect stdout to log
+    outlog = pj(logpath, f'{logname}.out')
+    fout = open(outlog, 'w')
+    sys.stdout = fout
+
+    # Redirect stderr to log
+    errlog = pj(logpath, f'{logname}.err')
+    ferr = open(errlog, 'w')
+    sys.stderr = ferr
+    #####################################################
+
+    # Initialize segmentation task:
+    seg = Segment(Ncl=Nclass, path_weights=str(path_weights), patch_size=patch_size)
+
+    # Segment tomogram:
+    scoremaps = seg.launch(tomo)
+
+    # Get labelmap from scoremaps:
+    labelmap  = sm.to_labelmap(scoremaps)
+
+    # Bin labelmap for the clustering step (saves up computation time):
+    scoremapsB = sm.bin(scoremaps)
+    labelmapB  = sm.to_labelmap(scoremapsB)
+
+    # Save labelmaps:
+    cm.write_array(labelmap , labelmap_file_name)
+    cm.write_array(labelmapB, labelmapB_file_name)
+
+    # Close log files & remove empty log files if any
+    fout.close()
+    # ferr.close()
+    for log in [outlog, errlog]:
+        if os.path.isfile(log) and os.path.getsize(log) == 0:
+            os.remove(log)

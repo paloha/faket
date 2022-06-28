@@ -9,8 +9,10 @@ import os
 import sys
 import h5py
 import time
+import json
 import models
 import losses
+import datetime
 import numpy as np
 from utils import core
 from utils import common as cm
@@ -209,7 +211,7 @@ class Train(core.DeepFinder):
     #       target_list contain str (path) or numpy array
     def launch(self, path_data, path_target, objlist_train, objlist_valid):
         """This function launches the training procedure. For each epoch, an image is plotted, displaying the progression
-        with different metrics: loss, accuracy, f1-score, recall, precision. Every 10 epochs, the current network weights
+        with different metrics: loss, accuracy, f1-score, recall, precision. Every x epochs, the current network weights
         are saved.
 
         Args:
@@ -225,23 +227,48 @@ class Train(core.DeepFinder):
 
         Note:
             The function saves following files at regular intervals:
-                net_weights_epoch*.h5: contains current network weights
-
-                net_train_history.h5: contains arrays with all metrics per training iteration
-
-                net_train_history_plot.png: plotted metric curves
+                epoch*_epoch.h5: contains current network weights
+                train_history.h5: contains arrays with all metrics per training iteration
+                train_history.png: plotted metric curves
 
         """
         self.check_attributes()
         self.check_arguments(path_data, path_target, objlist_train, objlist_valid)
         
-        # Redirecting stdout and stderr to a file to have logs stored on disk
-        outpath = pj(self.path_out, 'logs', 'training', f'{os.getpid()}.out')
-        errpath = pj(self.path_out, 'logs', 'training', f'{os.getpid()}.err')
-        os.makedirs(os.path.dirname(outpath), exist_ok=True)
-        os.makedirs(os.path.dirname(errpath), exist_ok=True)
-        sys.stdout = open(outpath, "a+")
-        sys.stderr = open(errpath, "a+")
+        # Logging ###########################################
+        logpath = pj(self.path_out, 'logs', 'training')
+        logname = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        os.makedirs(logpath, exist_ok=True)
+        
+        # Creating summary in log
+        summary = {
+            "training_tomograms" : path_data,
+            "num_epochs" : self.epochs,
+            "seed": self.seed,
+            "Nclass": self.Ncl,
+            "dim_in": self.dim_in,
+            "batch_size": self.batch_size,
+            "Nvalid": self.Nvalid,
+            "flag_direct_read": self.flag_direct_read,
+            "flag_batch_bootstrap": self.flag_batch_bootstrap,
+            "Lrnd": self.Lrnd,
+            "class_weights": self.class_weights,
+            }
+        with open(pj(logpath, f'{logname}.json'), 'w+') as fsum:
+            json.dump(summary, fsum, indent=4)
+
+        # Redirect stdout to log
+        outlog = pj(logpath, f'{logname}.out')
+        fout = open(outlog, 'a+')
+        origstdout = sys.stdout
+        sys.stdout = fout
+
+        # Redirect stderr to log
+        errlog = pj(logpath, f'{logname}.err')
+        ferr = open(errlog, 'a+')
+        origstderr = sys.stderr
+        sys.stderr = ferr
+        #####################################################
         
         if self.restart_from_epoch is None:
             self.display('Compiling the network ...')
@@ -260,7 +287,7 @@ class Train(core.DeepFinder):
         else:
             self.display(f'Restarting training from epoch {self.restart_from_epoch}.')
             # Load lists with previous history of training statistics:
-            hist = core.read_history(str(self.path_out / 'net_train_history.h5'))
+            hist = core.read_history(pj(logpath, 'train_history.h5'))
             hist_loss_train = hist['loss'].tolist()
             hist_acc_train  = hist['acc'].tolist()
             hist_loss_valid = hist['val_loss'].tolist()
@@ -278,6 +305,7 @@ class Train(core.DeepFinder):
         self.display('Launch training ...')
 
         # Training loop:
+        best_epoch, best_f1 = 1, 0.  # Keep info of best epoch
         for e in range(self.restart_from_epoch - 1, self.epochs):
             # TRAINING:
             start = time.time()
@@ -348,7 +376,12 @@ class Train(core.DeepFinder):
                 list_f1.append(scores[2])
                 list_recall.append(scores[1])
                 list_precision.append(scores[0])
-
+            
+            # Update info on the best epoch
+            if np.mean(list_f1) > best_f1:
+                best_f1 = np.mean(list_f1)
+                best_epoch = e + 1
+            
             hist_loss_valid.append(list_loss_valid)
             hist_acc_valid.append(list_acc_valid)
             hist_f1.append(list_f1)
@@ -361,7 +394,7 @@ class Train(core.DeepFinder):
             self.display((
                 f'EPOCH {e + 1}/{self.epochs} - valid loss: {loss_val[0]:.3f} - '
                 f'valid acc: {loss_val[1]:.3f} - {end - start:.2f}sec '
-                f'(from which {generatig_data_time:.2f}sec generating data & '
+                f'(from which {generating_data_time:.2f}sec generating data & '
                 f'{end - valid_start:.2f}sec validating)'
             ))
             
@@ -369,17 +402,36 @@ class Train(core.DeepFinder):
             history = {'loss': hist_loss_train, 'acc': hist_acc_train, 'val_loss': hist_loss_valid,
                        'val_acc': hist_acc_valid, 'val_f1': hist_f1, 'val_recall': hist_recall,
                        'val_precision': hist_precision}
-            core.save_history(history, str(self.path_out / 'net_train_history.h5'))
-            core.plot_history(history, str(self.path_out / 'net_train_history_plot.png'))
+            
+            
+            core.save_history(history, pj(logpath, 'train_history.h5'))
+            core.plot_history(history, pj(logpath, 'train_history.png'))
 
             self.display('=============================================================')
             
             if self.save_every is not None:
                 if (e + 1) % self.save_every == 0:  # save weights every epochs
-                    self.net.save(str(self.path_out / f'net_weights_epoch{str(e + 1)}.h5'))
+                    self.net.save(pj(self.path_out, f'epoch{e + 1:03d}_weights.h5'))
 
-        self.display("Model took %0.2f seconds to train since last restart." % np.sum(process_time))
-        self.net.save(str(self.path_out / 'net_weights_FINAL.h5'))
+        self.display(f"Model took {np.sum(process_time):.2f} seconds to train since last restart.")
+        self.display(f"Best model according to val_f1 is {best_epoch:03d} with score: {best_f1:.4f}.")
+        
+        # If the last epoch was not saved at `save_every`, save it now
+        save_final = self.save_every or (e + 1)
+        if (e + 1) % save_final == 0:
+            self.net.save(pj(self.path_out, f'epoch{e + 1:03d}_weights.h5'))
+        
+        # Close log files & remove empty log files if any
+        fout.close()
+        ferr.close()
+        for log in [outlog, errlog]:
+            if os.path.isfile(log) and os.path.getsize(log) == 0:
+                os.remove(log)
+                
+        # Redirecting back
+        sys.stdout = origstdout
+        sys.stderr = origstderr
+
 
     def check_arguments(self, path_data, path_target, objlist_train, objlist_valid):
         self.is_list(path_data, 'path_data')
