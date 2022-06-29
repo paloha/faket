@@ -271,26 +271,34 @@ class STIterate:
 
 
 class StyleTransfer:
-    def __init__(self, devices=['cpu'], pooling='max'):
+    def __init__(self, devices=['cpu'], pooling='max', 
+                 # Following parameters exposed in this constructor by FakET
+                 style_layers=None, content_layers=None,
+                 style_layers_weights=None, content_layers_weights=None): 
+        
         self.devices = [torch.device(device) for device in devices]
         self.image = None
         self.average = None
 
         # The default content and style layers in gatys Gatys et al. (2015)
-        # were [22] and [1, 6, 11, 20, 29] respectively. The following
-        # changes were made by Faket
-        self.content_layers = [11]
-        self.style_layers = [1, 6, 11, 20, 29] 
+        self.content_layers = content_layers or [22, ]
+        self.style_layers = style_layers or [1, 6, 11, 20, 29]
         
         # The weighting of the content layers introduced by Faket
-        content_weights = [100]  # Added by faket
-        weight_sum = sum(abs(w) for w in content_weights)
-        self.content_weights = [w / weight_sum for w in content_weights]
+        content_layers_weights = content_layers_weights or [100, ]
+        if len(content_layers_weights) != len(self.content_layers):
+            raise ValueError('Length of content_layers and content_layers_weights must match.')
+        weight_sum = sum(abs(w) for w in content_layers_weights)
+        self.content_layers_weights = [w / weight_sum for w in content_layers_weights]
 
         # The weighting of the style layers differs from Gatys et al. (2015) and Johnson et al.
-        style_weights = [256, 64, 16, 4, 1]
-        weight_sum = sum(abs(w) for w in style_weights)
-        self.style_weights = [w / weight_sum for w in style_weights] 
+        # FakET changed the name of self.style_weights to self.style_layers_weights to prevent
+        # confusion with style_weights local variable in self.stylize()
+        style_layers_weights = style_layers_weights or [256, 64, 16, 4, 1]
+        if len(style_layers_weights) != len(self.style_layers):
+            raise ValueError('Length of style_layers and style_layers_weights must match.')
+        weight_sum = sum(abs(w) for w in style_layers_weights)
+        self.style_layers_weights = [w / weight_sum for w in style_layers_weights] 
         # The style weights after normalization are:
         # [0.750733137829912,  0.187683284457478,  0.0469208211143695,  0.011730205278592375,  0.002932551319648094]
 
@@ -346,10 +354,10 @@ class StyleTransfer:
         content_weights = [content_weight / len(self.content_layers)] * len(self.content_layers)
         
         # Added by faket to support nonequal weights for each content layer
-        # This takes the cli arg content_weight into account (sum of the final content_weights is equal to content_weight)
-        nonequal_content_weights = getattr(self, 'content_weights', None)  
-        if nonequal_content_weights is not None:
-            content_weights = [w * sum(content_weights) for w in nonequal_content_weights]
+        # This takes the cli arg content_weight into account (sum of the final content_layers_weights is equal to content_weight)
+        content_layers_weights = getattr(self, 'content_layers_weights', None)  
+        if content_layers_weights is not None:
+            content_weights = [w * sum(content_weights) for w in content_layers_weights]
 
         if style_weights is None:  # Style weight for each image obtained from cli args
             style_weights = [1 / len(style_images)] * len(style_images)
@@ -423,7 +431,7 @@ class StyleTransfer:
                         style_targets[layer] = target
                     else:
                         style_targets[layer] += target
-            for layer, weight in zip(self.style_layers, self.style_weights):
+            for layer, weight in zip(self.style_layers, self.style_layers_weights):
                 target = style_targets[layer]
                 style_losses.append(Scale(LayerApply(StyleLoss(target), layer), weight))
 

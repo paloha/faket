@@ -203,6 +203,14 @@ def main():
                    help="if content is mrc, start of the range of images to be processed")
     p.add_argument('--seq_end', type=int, default=None,
                    help="if content is mrc, end of the range of images to be processed")
+    p.add_argument('--style_layers', '-sl', type=int, nargs='+', default=None,
+                   help='Indices of VGG conv layers features of which are used to compute the loss on style.')
+    p.add_argument('--style_layers_weights', '-slw', type=int, nargs='+', default=None,
+                   help='Weight of each of the cstylelayers in the loss computation.')
+    p.add_argument('--content_layers', '-cl', type=int, nargs='+', default=None,
+                   help='Indices of VGG conv layers features of which are used to compute the loss on content.')
+    p.add_argument('--content_layers_weights', '-clw', type=int, nargs='+', default=None,
+                   help='Weight of each of the content-layers in the loss computation.')
 
     args = p.parse_args()
     
@@ -305,9 +313,15 @@ def main():
     for device in devices:
         torch.tensor(0).to(device)
     torch.manual_seed(args.random_seed)
-
-    print('Loading model...')
-    st = StyleTransfer(devices=devices, pooling=args.pooling) 
+    
+    
+    print('Loading model...')   
+    st = StyleTransfer(devices=devices, 
+                       pooling=args.pooling, 
+                       style_layers=args.style_layers, 
+                       content_layers=args.content_layers, 
+                       style_layers_weights=args.style_layers_weights, 
+                       content_layers_weights=args.content_layers_weights) 
     
     output_image = []
     seq_len = 1 if input_type == 'image' else content_mrc.shape[0]
