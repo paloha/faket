@@ -28,8 +28,8 @@ if __name__ == '__main__':
 
     # Output file names
     identifier_fname = f'epoch{int(args.num_epochs):03d}_2021_model_{args.test_tomo_idx}_{args.test_tomogram}'
-    labelmap_file_name = pj(args.out_path, f'{identifier_fname}_labelmap.mrc')
-    labelmapB_file_name = pj(args.out_path, f'{identifier_fname}_bin2_labelmap.mrc')
+    labelmap_file_name = pj(args.out_path, f'{identifier_fname}_bin1_labelmap.mrc')  # No binning
+    labelmapB_file_name = pj(args.out_path, f'{identifier_fname}_bin2_labelmap.mrc')  # 2x binned
 
     Nclass = 16
     patch_size = 160 # must be multiple of 4
