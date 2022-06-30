@@ -2,6 +2,7 @@ import os
 import sys
 import random
 import argparse
+import warnings
 import numpy as np
 import produce_objl
 import tensorflow as tf
@@ -95,16 +96,19 @@ if __name__ == '__main__':
         
         if os.path.isdir(args.continue_training_path):
             weights_files = [x for x in os.listdir(args.continue_training_path) if x.endswith('_weights.h5')]
-            if (weights_files) == 0:
-                raise ValueError(f'No epoch***_weights.h5 file found in dir {args.continue_training_path}')
-            args.continue_training_path = pj(args.continue_training_path, sorted(weights_files)[-1])
+            if len(weights_files) == 0:
+                args.continue_training_path = None
+                warnings.warn(f'No epoch***_weights.h5 file found in dir {args.continue_training_path}, starting training from the beggining.')
+            else:
+                args.continue_training_path = pj(args.continue_training_path, sorted(weights_files)[-1])
         
-        trainer.net = load_model(args.continue_training_path,
-                                 custom_objects={'tversky_loss': tversky_loss})
+        if args.continue_training_path is not None:
+            trainer.net = load_model(args.continue_training_path,
+                                     custom_objects={'tversky_loss': tversky_loss})
 
-        # Get the last epoch number from the epoch***_weights.h5 filename
-        trainer.restart_from_epoch = \
-            int(splitext(basename(args.continue_training_path))[0].split('_')[0][len('epoch'):]) + 1
+            # Get the last epoch number from the epoch***_weights.h5 filename
+            trainer.restart_from_epoch = \
+                int(splitext(basename(args.continue_training_path))[0].split('_')[0][len('epoch'):]) + 1
 
         # Original DeepFinder code loaded just weights, which is incorrect
         # because it does not load the optimizer state.
