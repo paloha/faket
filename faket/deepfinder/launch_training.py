@@ -20,7 +20,7 @@ if __name__ == '__main__':
                         choices=['0','1','2','3','4','5','6','7','8'],
                         type=str, help="ids of tomogram within shrec based data set to be used for training of DF")
     parser.add_argument("--training_tomograms", nargs='*', type=str,
-                        choices=['baseline', 'content', 'noisy', 'styled', 'noiseless', 'volnoisy'],
+                        # choices=['baseline', 'content', 'noisy', 'styled', 'noiseless'],
                         help="type of tomograms to be used for training of DF")
     parser.add_argument("--num_epochs", type=int, help="number of epochs to train DF")
     parser.add_argument("--out_path", type=str, help="location where to store the weights of DF")
@@ -29,7 +29,7 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument("--seed", type=int, help="random seed", default=42)
     parser.add_argument("--continue_training_path", type=str, default=None,
-                        help="path to DF weights for continuing training")
+                        help="Path to DF weights for continuing training. If path is a dir, use the last weights sorted alphabetically.")
     args = parser.parse_args()
     
     # Tensorflow specific env variables
@@ -92,12 +92,19 @@ if __name__ == '__main__':
     if args.continue_training_path is not None:
         from losses import tversky_loss
         from tensorflow.keras.models import load_model
+        
+        if os.path.isdir(args.continue_training_path):
+            weights_files = [x for x in os.listdir(args.continue_training_path) if x.endswith('_weights.h5')]
+            if (weights_files) == 0:
+                raise ValueError(f'No epoch***_weights.h5 file found in dir {args.continue_training_path}')
+            args.continue_training_path = pj(args.continue_training_path, sorted(weights_files)[-1])
+        
         trainer.net = load_model(args.continue_training_path,
                                  custom_objects={'tversky_loss': tversky_loss})
 
-        # Get the last epoch number from the net_weights_epochN.h5 filename
+        # Get the last epoch number from the epoch***_weights.h5 filename
         trainer.restart_from_epoch = \
-            int(splitext(basename(args.continue_training_path))[0].split('epoch')[1]) + 1
+            int(splitext(basename(args.continue_training_path))[0].split('_')[0][len('epoch'):]) + 1
 
         # Original DeepFinder code loaded just weights, which is incorrect
         # because it does not load the optimizer state.
