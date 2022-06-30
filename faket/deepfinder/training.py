@@ -15,6 +15,7 @@ import losses
 import datetime
 import numpy as np
 from utils import core
+import tensorflow as tf
 from utils import common as cm
 from os.path import join as pj
 import tensorflow.keras.backend as K
@@ -302,7 +303,7 @@ class Train(core.DeepFinder):
             self.display('Loading dataset ...')
             data_list, target_list = core.load_dataset(path_data, path_target, self.h5_dset_name)
 
-        self.display('Launch training ...')
+        self.display('Launch training ...')     
 
         # Training loop:
         best_epoch, best_f1 = 1, 0.  # Keep info of best epoch
@@ -312,9 +313,18 @@ class Train(core.DeepFinder):
             list_loss_train = []
             list_acc_train = []
 
-            # compute batch indices
-            idxs = list(np.random.permutation(range(len(objlist_train))))
+            # FakET change how one epoch is defined, before, one epoch was just a
+            # specified number of training steps, but now one epoch iterates over
+            # all training data in random order such that each instance is seen at
+            # most once. Seed for initialization of the network itself does not 
+            # influence ordering of batches,
+            
+            # Random shuffle batch indices
+            rng = np.random.default_rng(12345+e)   
+            idxs = list(rng.permutation(range(len(objlist_train))))
+            n_idxs = len(idxs)
 
+            # Iterate over all data instead of specified number of steps
             #n_iterations = self.steps_per_epoch
             n_iterations = int(len(objlist_train) / self.batch_size)
 
@@ -323,9 +333,9 @@ class Train(core.DeepFinder):
             
             for it in range(n_iterations):
                 t0 = time.time()
-                if (it+1)*self.batch_size < len(idxs):
+                if (it+1)*self.batch_size < n_idxs:
                     batch_idxs = idxs[it*self.batch_size: (it+1)*self.batch_size]
-                else:
+                else:  # Last batch might have less samples
                     batch_idxs = idxs[it*self.batch_size:]
                     batch_idxs = batch_idxs + idxs[:self.batch_size - len(batch_idxs)]
 
@@ -333,12 +343,9 @@ class Train(core.DeepFinder):
                 if self.flag_direct_read:
                     batch_data, batch_target = self.generate_batch_direct_read(path_data, path_target, self.batch_size, objlist_train, batch_idxs=batch_idxs)
                 else:
-                    batch_data, batch_target, idx_list = self.generate_batch_from_array(data_list, target_list, self.batch_size, objlist_train)
-
-                if self.sample_weights is not None:
-                    sample_weight = self.sample_weights[idx_list]
-                else:
-                    sample_weight = None
+                    batch_data, batch_target, idx_list = self.generate_batch_from_array(data_list, target_list, self.batch_size, objlist_train, batch_idxs=batch_idxs)
+                    
+                sample_weight = None if self.sample_weights is None else self.sample_weights[idx_list]
                     
                 generating_data_time += time.time() - t0
                 
@@ -349,6 +356,9 @@ class Train(core.DeepFinder):
                 self.display('epoch %d/%d - it %d/%d - loss: %0.3f - acc: %0.3f' % (e + 1, self.epochs, it + 1, n_iterations, loss_train[0], loss_train[1]))
                 list_loss_train.append(loss_train[0])
                 list_acc_train.append(loss_train[1])
+                
+                # Write stdout to file immediately
+                fout.flush()
                 
             hist_loss_train.append(list_loss_train)
             hist_acc_train.append(list_acc_train)
@@ -366,10 +376,19 @@ class Train(core.DeepFinder):
                     batch_data_valid, batch_target_valid = self.generate_batch_direct_read(path_data, path_target, self.batch_size, objlist_valid)
                 else:
                     batch_data_valid, batch_target_valid, idx_list = self.generate_batch_from_array(data_list, target_list, self.batch_size, objlist_valid)
-                loss_val = self.net.evaluate(batch_data_valid, batch_target_valid, verbose=0) # TODO replace by loss() to reduce computation
-                batch_pred = self.net.predict(batch_data_valid)
+                
+                
+                # Faket fix of memory leak (when numpy array is passed, creates new graph)
+                # Read more here: https://medium.com/dive-into-ml-ai/dealing-with-memory-leak-issue-in-keras-model-training-e703907a6501
+                batch_data_valid = tf.convert_to_tensor(batch_data_valid)  
+                batch_pred = self.net.predict_on_batch(batch_data_valid)
+                loss_val = self.net.evaluate(batch_data_valid, batch_target_valid, verbose=0, batch_size=len(batch_data_valid)) # TODO replace by loss() to reduce computation
+                
+                # batch_pred = self.net.predict(batch_data_valid)
                 #loss_val = K.eval(losses.tversky_loss(K.constant(batch_target_valid), K.constant(batch_pred)))
-                scores = precision_recall_fscore_support(batch_target_valid.argmax(axis=-1).flatten(), batch_pred.argmax(axis=-1).flatten(), average=None, labels=self.label_list)
+                scores = precision_recall_fscore_support(batch_target_valid.argmax(axis=-1).flatten(), 
+                                                         batch_pred.argmax(axis=-1).flatten(), average=None, 
+                                                         labels=self.label_list)
 
                 list_loss_valid.append(loss_val[0])
                 list_acc_valid.append(loss_val[1])
@@ -412,6 +431,10 @@ class Train(core.DeepFinder):
             if self.save_every is not None:
                 if (e + 1) % self.save_every == 0:  # save weights every epochs
                     self.net.save(pj(self.path_out, f'epoch{e + 1:03d}_weights.h5'))
+                    
+            # Housekeeping
+            gc.collect()
+            K.clear_session()
 
         self.display(f"Model took {np.sum(process_time):.2f} seconds to train since last restart.")
         self.display(f"Best model according to val_f1 is {best_epoch:03d} with score: {best_f1:.4f}.")
@@ -444,6 +467,7 @@ class Train(core.DeepFinder):
     # current batch content is loaded into memory, which is useful when memory is limited.
     # Is called when self.flag_direct_read=True
     # !! For now only works for h5 files !!
+    # !! FakET - now also mrc files are supported !!
     # Batches are generated as follows:
     #   - The positions at which patches are sampled are determined by the coordinates contained in the object list.
     #   - Two data augmentation techniques are applied:
@@ -472,32 +496,57 @@ class Train(core.DeepFinder):
             pool = range(0, len(objlist))
 
         for i in range(batch_size):
+            # Faket fixing seed to get the same results when using 
+            # `generate_batch_direct_read` and `generate_batch_from_array`
+            rng = np.random.default_rng(12345+i)
+                
             # If batch indices are given
             index = 0
-            if batch_idxs:
+            if batch_idxs is not None:
                 index = batch_idxs[i]
             # Choose random object in training set:
-            else:
-                index = np.random.choice(pool)
+            else: 
+                index = rng.choice(pool)
 
-
-
+            # FakET support for loading mrc files as memmory maps for direct read
             tomoID = int(objlist[index]['tomo_idx'])
-
-            h5file = h5py.File(path_data[tomoID], 'r')
-            tomodim = h5file['dataset'].shape  # get tomo dimensions without loading the array
-            h5file.close()
-
+            data_file_path = path_data[tomoID]
+            target_file_path = path_target[tomoID]
+        
+            if data_file_path.endswith('.mrc') and target_file_path.endswith('.mrc'):
+                import mrcfile
+                data_file = mrcfile.mmap(data_file_path, mode='r')
+                data = data_file.data
+                target_file = mrcfile.mmap(target_file_path, mode='r')
+                target = target_file.data
+            elif data_file_path.endswith('.h5') and target_file_path.endswith('.h5'):
+                data_file = h5py.File(data_file_path, 'r')
+                data = data_file['dataset']
+                target_file = h5py.File(target_file_path, 'r')
+                target = target_file['dataset']
+            else:
+                raise ValueError('With direct read, only .mrc and .h5 files are supported.')
+            
+            tomodim = data.shape
             x, y, z = core.get_patch_position(tomodim, p_in, objlist[index], self.Lrnd)
+            patch_data = data[z-p_in:z+p_in, y-p_in:y+p_in, x-p_in:x+p_in]
+            patch_target = target[z-p_in:z+p_in, y-p_in:y+p_in, x-p_in:x+p_in]
+            data_file.close()
+            target_file.close()
+            # FakET changes end -------------------------------------------------------
 
-            # Load data and target patches:
-            h5file = h5py.File(path_data[tomoID], 'r')
-            patch_data = h5file['dataset'][z-p_in:z+p_in, y-p_in:y+p_in, x-p_in:x+p_in]
-            h5file.close()
-
-            h5file = h5py.File(path_target[tomoID], 'r')
-            patch_target = h5file['dataset'][z-p_in:z+p_in, y-p_in:y+p_in, x-p_in:x+p_in]
-            h5file.close()
+            # Original code by DeepFinder (which supported only h5 files)
+            # h5file = h5py.File(path_data[tomoID], 'r')
+            # tomodim = h5file['dataset'].shape  # get tomo dimensions without loading the array
+            # h5file.close()
+            # x, y, z = core.get_patch_position(tomodim, p_in, objlist[index], self.Lrnd)
+            # # Load data and target patches:
+            # h5file = h5py.File(path_data[tomoID], 'r')
+            # patch_data = h5file['dataset'][z-p_in:z+p_in, y-p_in:y+p_in, x-p_in:x+p_in]
+            # h5file.close()
+            # h5file = h5py.File(path_target[tomoID], 'r')
+            # patch_target = h5file['dataset'][z-p_in:z+p_in, y-p_in:y+p_in, x-p_in:x+p_in]
+            # h5file.close()
 
             # Process the patches in order to be used by network:
             patch_data = (patch_data - np.mean(patch_data)) / np.std(patch_data)  # normalize
@@ -508,7 +557,7 @@ class Train(core.DeepFinder):
             batch_target[i] = patch_target_onehot
 
             # Data augmentation (180degree rotation around tilt axis):
-            if np.random.uniform() < 0.5:
+            if rng.uniform() < 0.5:
                 batch_data[i] = np.rot90(batch_data[i], k=2, axes=(0, 2))
                 batch_target[i] = np.rot90(batch_target[i], k=2, axes=(0, 2))
 
@@ -525,7 +574,7 @@ class Train(core.DeepFinder):
     # OUTPUT:
     #   batch_data: numpy array [batch_idx, z, y, x, channel] in our case only 1 channel
     #   batch_target: numpy array [batch_idx, z, y, x, class_idx] is one-hot encoded
-    def generate_batch_from_array(self, data, target, batch_size, objlist=None):
+    def generate_batch_from_array(self, data, target, batch_size, objlist=None, batch_idxs=None):
         p_in = np.int(np.floor(self.dim_in / 2))
 
         batch_data = np.zeros((batch_size, self.dim_in, self.dim_in, self.dim_in, 1))
@@ -540,11 +589,22 @@ class Train(core.DeepFinder):
         idx_list = []
         for i in range(batch_size):
             # choose random sample in training set:
-            index = np.random.choice(pool)
+            rng = np.random.default_rng(12345+i)  
+            
+            # FakET - Following lines copied from generate_batch_direct_read
+            # because the two functions did not behave exactly the same
+            # way which influenced the reproducibility of the results
+            # If batch indices are given
+            index = 0
+            if batch_idxs is not None:
+                index = batch_idxs[i]
+            # Choose random object in training set:
+            else: 
+                index = rng.choice(pool)
+
             idx_list.append(index)
 
             tomoID = int(objlist[index]['tomo_idx'])
-
             tomodim = data[tomoID].shape
 
             sample_data = data[tomoID]
@@ -566,7 +626,7 @@ class Train(core.DeepFinder):
             batch_target[i] = patch_target_onehot
 
             # Data augmentation (180degree rotation around tilt axis):
-            if np.random.uniform() < 0.5:
+            if rng.uniform() < 0.5:
                 batch_data[i] = np.rot90(batch_data[i], k=2, axes=(0, 2))
                 batch_target[i] = np.rot90(batch_target[i], k=2, axes=(0, 2))
 
