@@ -1,7 +1,4 @@
-
-
 import utils.objl as ol
-
 
 label_dict = {
                 '4V94' : 1,
@@ -30,26 +27,11 @@ def read_txt(filename, idx):
             ol.add_obj(objlOUT, tomo_idx=tomo_idx ,label=label_dict[lbl], coord=(float(x), float(y), float(z)))
     return objlOUT
 
-
-
-#filename = 'objl_valid_2021.xml'
-#filename = 'objl_training_2021.xml'
-#filename = 'objl_training_2021_double.xml'
-
-
-#paths = ['../../../faket/data/shrec2021_contest_dataset/model_8/particle_locations.txt']
-
 def create_objl(paths, tomo_id=None):
     objl = []
     for idx, path in enumerate(paths):
         if tomo_id is not None:
-            objl =objl + read_txt(path, tomo_id)
+            objl = objl + read_txt(path, tomo_id)
         else:
-            objl =objl + read_txt(path, idx)
+            objl = objl + read_txt(path, idx)
     return objl
-
-
-
-#ol.write(objl, filename)
-
-
