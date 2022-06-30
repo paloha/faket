@@ -5,6 +5,7 @@
 # License: GPL v3.0. See <https://www.gnu.org/licenses/>
 # =============================================================================================
 
+import gc
 import os
 import sys
 import h5py
