@@ -21,6 +21,11 @@ if __name__ == '__main__':
                         help="path to the folder of the label map that results from segmentation")
     parser.add_argument("--out_path", type=str, 
                         help="out path for the xml files resulting from clustering")
+    parser.add_argument("--n_jobs", type=int, default=1,
+                        help="The number of jobs to use for the MeanShift computation. Computes each of the n_init runs in parallel.")
+    parser.add_argument('--overwrite', action='store_true',  # If not provided, means False
+                        help='If specified, overwrites previously computed results.')
+    
     args = parser.parse_args()
 
     identifier_fname = f'epoch{int(args.num_epochs):03d}_2021_model_{args.test_tomo_idx}_{args.test_tomogram}_bin2'
@@ -29,8 +34,14 @@ if __name__ == '__main__':
     labelmap_path = pj(args.label_map_path, f'{identifier_fname}_labelmap.mrc')
     
     # Output file names
-    raw_path = pj(args.out_path, f'{identifier_fname}_objlist_thr.xml')
-    thr_path = pj(args.out_path, f'{identifier_fname}_objlist_raw.xml')
+    thr_path = pj(args.out_path, f'{identifier_fname}_objlist_thr.xml')
+    raw_path = pj(args.out_path, f'{identifier_fname}_objlist_raw.xml')
+    
+    if os.path.exists(raw_path) and os.path.exists(thr_path):
+        if not args.overwrite:
+            print(f'Already computed! --overwrite not specified, so skipping: {labelmap_path}')
+            exit(0)  # Success return code
+    
     cluster_radius = 5         # should correspond to average radius of target objects (in voxels)
     cluster_size_threshold = 1 # found objects smaller than this threshold are immediately discarded
     
@@ -52,7 +63,8 @@ if __name__ == '__main__':
         "labelmap_path": labelmap_path, 
         "cluster_radius" : cluster_radius, 
         "cluster_size_threshold": cluster_size_threshold, 
-        "class_thresholds": dict(zip(lbl_list, thr_list))}
+        "class_thresholds": dict(zip(lbl_list, thr_list)),
+        "n_jobs": args.n_jobs}
     with open(pj(logpath, f'{logname}.json'), 'w') as fsum:
         json.dump(summary, fsum, indent=4)
 
@@ -72,7 +84,7 @@ if __name__ == '__main__':
     clust.sizeThr = cluster_size_threshold
 
     # Launch clustering (result stored in objlist): can take some time (37min on i7 cpu)
-    objlist = clust.launch(labelmapB)
+    objlist = clust.launch(labelmapB, n_jobs=args.n_jobs)
 
     # The coordinates have been obtained from a binned (subsampled) volume, 
     # therefore coordinates have to be re-scaled in

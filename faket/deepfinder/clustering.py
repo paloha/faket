@@ -33,7 +33,7 @@ class Cluster(core.DeepFinder):
     #   clustRadius: parameter for clustering algorithm. Corresponds to average object radius (in voxels)
     # OUTPUT:
     #   objlist: a xml structure containing infos about detected objects: coordinates, class label and cluster size
-    def launch(self, labelmap):
+    def launch(self, labelmap, n_jobs=1):
         """This function analyzes the segmented tomograms (i.e. labelmap), identifies individual macromolecules and outputs
         their coordinates. This is achieved with a clustering algorithm (meanshift).
 
@@ -51,9 +51,9 @@ class Cluster(core.DeepFinder):
         objvoxels = np.nonzero(labelmap > 0)
         objvoxels = np.array(objvoxels).T  # convert to numpy array and transpose
 
-        self.display('Launch clustering ...')
+        self.display(f'Launch clustering of {len(objvoxels)} objvoxels in {n_jobs} parallel jobs...')
         start = time.time()
-        clusters = MeanShift(bandwidth=self.clustRadius, bin_seeding=True).fit(objvoxels)
+        clusters = MeanShift(bandwidth=self.clustRadius, bin_seeding=True, n_jobs=n_jobs).fit(objvoxels)
         end = time.time()
         self.display("Clustering took %0.2f seconds" % (end - start))
 
