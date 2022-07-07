@@ -25,6 +25,9 @@ if __name__ == '__main__':
                         help="The number of jobs to use for the MeanShift computation. Computes each of the n_init runs in parallel.")
     parser.add_argument('--overwrite', action='store_true',  # If not provided, means False
                         help='If specified, overwrites previously computed results.')
+    parser.add_argument('--only_apply_thresholding', action='store_true',  # If not provided, means False
+                        help='If specified, loads raw objlist and applies thresholds.')
+    
     
     args = parser.parse_args()
 
@@ -34,73 +37,108 @@ if __name__ == '__main__':
     labelmap_path = pj(args.label_map_path, f'{identifier_fname}_labelmap.mrc')
     
     # Output file names
-    thr_path = pj(args.out_path, f'{identifier_fname}_objlist_thr.xml')
     raw_path = pj(args.out_path, f'{identifier_fname}_objlist_raw.xml')
+    thr_path = pj(args.out_path, f'{identifier_fname}_objlist_thr.xml')
     
-    if os.path.exists(raw_path) and os.path.exists(thr_path):
-        if not args.overwrite:
-            print(f'Already computed! --overwrite not specified, so skipping: {labelmap_path}')
-            exit(0)  # Success return code
+    # Log file names
+    logpath = pj(args.out_path, 'logs', 'clustering')
+    summary_fname = pj(logpath, f'{identifier_fname}.json')
+    outlog = pj(logpath, f'{identifier_fname}.out')
+    errlog = pj(logpath, f'{identifier_fname}.err')
+
+    # Flow control - handling if one or both output files were already computed
+    if os.path.exists(raw_path):
+        if os.path.exists(thr_path):
+            if not args.overwrite:
+                print(f'Already computed! --overwrite not specified, so skipping: {labelmap_path}')
+                exit(0)  # Success return code
+        else:
+            if not args.only_apply_thresholding and not args.overwrite:
+                raise ValueError(f'File {thr_path} does not exit. Either use --overwrite or --only_apply_thresholding.')
+    else:
+        if args.only_apply_thresholding:
+            raise ValueError(f'File {raw_path} does not exist. Can not apply thresholding only.')
+        
+        if os.path.exists(thr_path) and not args.overwrite:
+            raise ValueError(f'File {thr_path} already exists. Use --overwrite.')
+            
+    if args.only_apply_thresholding and not os.path.exists(summary_fname):
+        raise ValueError(f'File {summary_fname} does not exist. Do not use --only_apply_thresholding. Recompute whole clustering.')
     
     cluster_radius = 5         # should correspond to average radius of target objects (in voxels)
     cluster_size_threshold = 1 # found objects smaller than this threshold are immediately discarded
     
     # As macromolecules have different size, each class has its own size threshold (for removal).
     # The thresholds have been determined on the validation set.
-    lbl_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    thr_list = [1000, 1, 1, 1, 1, 20, 20, 20, 1, 1, 1, 1, 1, 1000, 1]
+    # background 0, 4V94 1, 4CR2 2, 1QVR 3, 1BXN 4, 3CF3 5, 1U6G 6, 3D2F 7, 2CG9 8, 
+    # 3H84 9, 3GL1 10, 3QM1 11, 1S3X 12, 5MRC 13, vesicle 14, fiducial 15
+    lbl_list = [1,    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,   15]
+    thr_list = [1000, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1,  1000, 1]  # FakET all to 1
 
     # Load data:
     labelmapB = cm.read_array(labelmap_path)
-
-    # Logging ###########################################
-    logpath = pj(args.out_path, 'logs', 'clustering')
-    logname = identifier_fname
-    os.makedirs(logpath, exist_ok=True)
-
-    # Creating summary in log
-    summary = {
-        "labelmap_path": labelmap_path, 
-        "cluster_radius" : cluster_radius, 
-        "cluster_size_threshold": cluster_size_threshold, 
-        "class_thresholds": dict(zip(lbl_list, thr_list)),
-        "n_jobs": args.n_jobs}
-    with open(pj(logpath, f'{logname}.json'), 'w') as fsum:
-        json.dump(summary, fsum, indent=4)
-
-    # Redirect stdout to log
-    outlog = pj(logpath, f'{logname}.out')
-    fout = open(outlog, 'w')
-    sys.stdout = fout
-
-    # Redirect stderr to log
-    errlog = pj(logpath, f'{logname}.err')
-    ferr = open(errlog, 'w')
-    sys.stderr = ferr
-    #####################################################
     
-    # Initialize clustering task:
-    clust = Cluster(clustRadius=5)
-    clust.sizeThr = cluster_size_threshold
+    if not args.only_apply_thresholding:
+        if not os.path.exists(raw_path) or args.overwrite:
+            
+            # Logging clustering step ###########################
+            os.makedirs(logpath, exist_ok=True)
 
-    # Launch clustering (result stored in objlist): can take some time (37min on i7 cpu)
-    objlist = clust.launch(labelmapB, n_jobs=args.n_jobs)
+            # Creating summary in log
+            summary = {
+                "labelmap_path": labelmap_path, 
+                "cluster_radius" : cluster_radius, 
+                "cluster_size_threshold": cluster_size_threshold, 
+                "class_thresholds": dict(zip(lbl_list, thr_list)),
+                "n_jobs": args.n_jobs}
+            with open(summary_fname, 'w') as fsum:
+                json.dump(summary, fsum, indent=4)
 
-    # The coordinates have been obtained from a binned (subsampled) volume, 
-    # therefore coordinates have to be re-scaled in
-    # order to compare to ground truth:
-    objlist = ol.scale_coord(objlist, 2)
+            # Redirect stdout to log
+            fout = open(outlog, 'w')
+            sys.stdout = fout
 
+            # Redirect stderr to log
+            ferr = open(errlog, 'w')
+            sys.stderr = ferr
+            #####################################################
+    
+            # Initialize clustering task:
+            clust = Cluster(clustRadius=5)
+            clust.sizeThr = cluster_size_threshold
+
+            # Launch clustering (result stored in objlist): can take some time (37min on i7 cpu)
+            objlist = clust.launch(labelmapB, n_jobs=args.n_jobs)
+
+            # The coordinates have been obtained from a binned (subsampled) volume, 
+            # therefore coordinates have to be re-scaled in
+            # order to compare to ground truth:
+            objlist = ol.scale_coord(objlist, 2)
+            
+            # Save raw object list:
+            ol.write_xml(objlist, raw_path)
+            
+            # Close log files & remove empty log files if any
+            fout.close()
+            ferr.close()
+            for log in [outlog, errlog]:
+                if os.path.isfile(log) and os.path.getsize(log) == 0:
+                    os.remove(log)
+    else:
+        # Load raw_path from xml file instead of computing it
+        objlist = ol.read_xml(raw_path)
+        
+        # Load summary_fname from json file for updating
+        with open(summary_fname, 'r') as fsum:
+            summary = json.load(fsum)
+        
+        # Update and save the summary file
+        summary.update({'class_thresholds': dict(zip(lbl_list, thr_list))})
+        with open(summary_fname, 'w') as fsum:
+                json.dump(summary, fsum, indent=4)
+        
     # Filtering out particles (false positives) that are too small (based on desired thresholds)
     objlist_thr = ol.above_thr_per_class(objlist, lbl_list, thr_list)
 
-    # Save object lists:
-    ol.write_xml(objlist, raw_path)
+    # Save thresholded object lists:
     ol.write_xml(objlist_thr, thr_path)
-    
-    # Close log files & remove empty log files if any
-    fout.close()
-    ferr.close()
-    for log in [outlog, errlog]:
-        if os.path.isfile(log) and os.path.getsize(log) == 0:
-            os.remove(log)
