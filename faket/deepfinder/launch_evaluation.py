@@ -51,7 +51,7 @@ if __name__ == '__main__':
     # Run the original SHREC'21 evaluation script
     interpreter = 'python3'
     eval_script = pj('faket', 'shrec2021', 'eval.py')
-    test_tomogram_folder = pj('data', 'shrec2021_extended_dataset', 'model_9', 'faket')
+    test_tomogram_folder = pj('data', 'shrec2021_extended_dataset', f'model_{args.test_tomo_idx}', 'faket')
     args = [
         f'-s {pj(args.out_path, particle_list_fname)}',  # Predicted
         f'-t {test_tomogram_folder}',  #  Ground truth
