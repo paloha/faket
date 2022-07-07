@@ -1,13 +1,12 @@
 # This script originally comes from SHREC2021 challenge `misc/eval.py`.
 # We (FakET) copied it and made only necessary changes such that we can 
 # export the confusion matrices and stats as machine readable files. 
-# Which was not possible without a code change. We also fixed some bugs
-# with argparser bool flags. All our chagnes are commented with "# FakET".
-# NOTE, due to the if clause `if (p and p[0][0] != '4V94')` near line 197, 
-# we think there might be a bug in the SHREC eval.py when not skipping
-# the particle 4v94. But since it should be always skipped, probably the 
-# bug did not ever occur. Therefore we are not investigating it further.
-# Use --skip_4v94 and --skip_vesicles and all should be good.
+# Which was not possible without a code change. 
+
+# We also fixed some bugs: 
+# - bug with argparser bool flags
+# - bug with handling exclusion of particles
+# All our chagnes are commented with "# FakET".
 
 # ---------------------------------------------------------------------
 # Dependencies can be installed with the following command:
@@ -74,10 +73,14 @@ if __name__ == '__main__':
     num2pdb = {k: v for k, v in enumerate(classes)}
     pdb2num = {v: k for k, v in num2pdb.items()}
 
+    # FakET bugfix (introducing variable excluded)
+    excluded = []
     if args.skip_4v94:
+        excluded.append('4V94')
         del num2pdb[pdb2num['4V94']]
         del pdb2num['4V94']
     if args.skip_vesicles:
+        excluded.append('vesicle')
         del num2pdb[pdb2num['vesicle']]
         del pdb2num['vesicle']
 
@@ -92,6 +95,13 @@ if __name__ == '__main__':
     if args.skip_4v94:
         n_4v94_particle = len([p for p in gt_particles if p[0] == '4V94'])
         n_gt_particles -= n_4v94_particle
+    
+    # FakET - I am not sure why SHREC does not subtract also n_vesicles_particles
+    # from n_gt_particles if args.skip_vesicles, maybe they do not count it as a particle??
+    # Shall we add the following code then??
+    # if args.skip_vesicles:
+    #     n_vesicles = len([p for p in gt_particles if p[0] == 'vesicle'])
+    #     n_gt_particles -= n_vesicles
 
     # load class mask and occupancy mask
     with mrc.open(args.tomo / 'occupancy_mask.mrc', permissive=True) as f:
@@ -103,6 +113,11 @@ if __name__ == '__main__':
     #     v = napari.Viewer()
     #     v.add_image(dilated)
 
+    # FakET change - Overwrite previous evaluation.txt
+    eval_fpath = os.path.join(args.output, 'evaluation.txt')
+    if os.path.exists(eval_fpath):
+        os.remove(eval_fpath)
+    
     # Evaluate each submission
     for submission_i, submission in enumerate(submissions):
         gt_particles2 = gt_particles.copy()
@@ -114,7 +129,7 @@ if __name__ == '__main__':
         # FakET changes
         # with open(args.output, mode='a+') as f:
         #     f.write(report)
-        with open(os.path.join(args.output, 'evaluation.txt'), mode='a+') as f:
+        with open(eval_fpath, mode='a+') as f:
                   f.write(report)
 
         # Load predicted particles and their classes
@@ -122,7 +137,8 @@ if __name__ == '__main__':
         with open(submission, 'rU') as f:
             for line in f:
                 pdb, x, y, z, *_ = line.rstrip('\n').split()
-                if pdb != 'fiducial':
+                # if pdb != 'fiducial':  # BUG IN ORIGINAL EVAL, FIX BY FakET
+                if pdb not in ['fiducial', 'vesicle']:  # background should be already excluded at clustering step
                     pdb = pdb.upper()
                 predicted_particles.append((pdb, int(round(float(x))), int(round(float(y))), int(round(float(z)))))
         n_predicted_particles = len(predicted_particles)
@@ -131,7 +147,7 @@ if __name__ == '__main__':
         n_clipped_predicted_particles = 0  # number of particles that were predicted to be outside of tomogram
         found_particles = [[] for _ in range(len(gt_particles2))]  # reported classes and distances for each GT particle
 
-        # Go through each particle
+        # Go through each predicted particle
         for p_i, (p_pdb, *coordinates) in enumerate(predicted_particles):
 
             # Clamp coordinates to avoid out of bounds
@@ -151,18 +167,27 @@ if __name__ == '__main__':
             # Register found particle, a class it is predicted to be and distance from predicted center to real center
             found_particles[p_gt_id].append((p_pdb, p_distance))
 
-        # if skip 4V94, remove 4V94s from both GT and predicted
-        if args.skip_4v94:
-            for i in range(len(gt_particles2) - 1, 0, -1):
-                if gt_particles2[i][0] == '4V94':
+        # FakET change (use excluded variable) ------------------------------
+        # if particle is in excluded, e.g. 4V94, remove all of them from both GT and predicted
+        if excluded:
+            for i in range(len(gt_particles2) - 1, -1, -1):
+                if gt_particles2[i][0] in excluded:
                     del gt_particles2[i]
                     del found_particles[i]
 
-        if args.skip_vesicles:
-            for i in range(len(gt_particles2) - 1, -1, -1):
-                if gt_particles2[i][0] == 'vesicle':
-                    del gt_particles2[i]
-                    del found_particles[i]
+        # original code from SHREC
+        # if args.skip_4v94:
+        #     for i in range(len(gt_particles2) - 1, 0, -1):
+        #         if gt_particles2[i][0] == '4V94':
+        #             del gt_particles2[i]
+        #             del found_particles[i]
+
+        # if args.skip_vesicles:
+        #     for i in range(len(gt_particles2) - 1, -1, -1):
+        #         if gt_particles2[i][0] == 'vesicle':
+        #             del gt_particles2[i]
+        #             del found_particles[i]
+        # -----------------------------------------------------------------------
 
         # Compute localization statistics
         n_prediction_missed = len(found_particles[0])
@@ -179,17 +204,31 @@ if __name__ == '__main__':
 
         # Compute classification statistics and confusion matrix
         gt_particle_classes = np.asarray([pdb2num[p[0]] for p in gt_particles2[1:]], dtype=int)
-        predicted_particle_classes = np.asarray([pdb2num[p[0][0]] if (p and p[0][0] != '4V94') else 0 for p in found_particles[1:]], dtype=int)  # taking the first occurrence only
+        
+        # BUG IN ORIGINAL EVAL SCRIPT, FIX BY FakET
+        # predicted_particle_classes = np.asarray(
+        #     [pdb2num[p[0][0]] if (p and p[0][0] != '4V94') else 0 
+        #          for p in found_particles[1:]], 
+        #     dtype=int)  # taking the first occurrence only
+        
+        predicted_particle_classes = np.asarray(  # If in excluded, prediction is set to 0 (background)
+            [pdb2num[p[0][0]] if (p and p[0][0] not in excluded) else 0 
+                 for p in found_particles[1:]], 
+            dtype=int)  # taking the first occurrence only (FakET comment: WHY the first?)
+        
         confusion_matrix = ConfusionMatrix(actual_vector=gt_particle_classes, predict_vector=predicted_particle_classes)
         confusion_matrix.relabel(num2pdb)
 
         # FakET changes (to make confusion matrix file names alike output file name)
         labels = [  # Sorted according to size
             'background', 
+            '4V94', # Most probably excluded (depends on args)
             '1S3X', '3QM1', '3GL1', '3H84', '2CG9',  # small
             '3D2F', '1U6G', '3CF3', '1BXN', '1QVR',  # medium
             '4CR2', '5MRC', # large
+            'vesicle', # Most probably excluded (depends on args)
             'fiducial']  
+        labels = [p for p in labels if p not in excluded]
         # --------------
         
         if args.confusion:
