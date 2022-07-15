@@ -1,60 +1,29 @@
 import numpy as np
 
-def ramp2d(sizeX, sizeY, crowtherFreq=None, radiusCutoff=None, angularCutoff=None):
+
+def hann1d(size):
     """
-    2D ramp filter with support for Crowther frequency, 
-    radius cutoff, and angular cutoff. Returns fftshifted
-    2D array containing the filter which can be directly
-    mulitplied with a 2D DFT of an image.
-
-    angularCutoff, numerical or 2-tuple
-    
-    Example of usage:
-    filtered = ifft2(fft2(image) * ramp2d(sizeX, sizeY, 20, 180, 82)).real
-    filtered = ifft2(fft2(image) * ramp2d(sizeX, sizeY, 20, 180, (8, 82))).real
+    1D Hann filter as implemented in Radontea package
+    https://github.com/RI-imaging/radontea/blob/01fb924b2a241914328c6526ced7248807f3adea/radontea/_alg_bpj.py#L138
+    Returns fftshifted filter (high-frequencies in the center).
     """
-
-    # Centered grids
-    shape = np.array([sizeX, sizeY])
-    ii = np.abs(np.indices(shape) - (shape // 2).reshape(2, 1, 1))
-
-    # Important frequencies
-    nyquist = np.max([sizeX, sizeY]) / 2
-    unit = crowtherFreq or nyquist
-    assert unit <= nyquist, f'Max crowtherFreq is nyquist {nyquist}.'
-    
-    # Filter
-    radius = np.sqrt(ii[0] ** 2 + ii[1] ** 2)
-    ramp =  radius / unit
-    ramp[ramp > 1] = 1
-    
-    # Angular cutoff
-    if angularCutoff is not None:
-        ang = np.arctan2(ii[0], ii[1])
-        if isinstance(angularCutoff, tuple):
-            a, b =  angularCutoff
-            assert a >= 0 and a <= 90, 'Choose angle betwen 0° and 90°'
-        else:
-            b = angularCutoff
-            assert b >= 45 and b <= 90, 'Choose angle between 45° and 90°'
-            a = 90 - b 
-        ramp[ang < np.deg2rad(a)] = 0
-        ramp[ang > np.deg2rad(b)] = 0
-        
-    
-    # Circular cut (if radiusCutoff is None, no cut)
-    if radiusCutoff is not None:
-        ramp[radius >= radiusCutoff] = 0
-    
-    return np.fft.fftshift(ramp)
+    kx = 2 * np.pi * np.abs(np.fft.fftfreq(int(size)))  # ramp
+    kx[1:] = kx[1:] * (1 + np.cos(kx[1:])) / 2 # hann
+    return kx
 
 
 def ramp1d(size, crowtherFreq=None, radiusCutoff=None):
     """
-    Implementation of a ramp filter with support for CrowtherFreq 
-    and CircularCutoff. Returns fftshifted filter ready to be
-    mulitplied with a 1D DFT of an image.
+    Implementation of a 1D ramp filter with support for CrowtherFreq 
+    and CircularCutoff. Returns fftshifted (high-frequencies in the center)
+    filter ready to be mulitplied with a 1D DFT of an image.
     
+    Visualize:
+    ----------
+    plt.plot(ramp1d(512, 150, 250))
+    
+    Example:
+    --------
     filtered = ifft(fft(image, axis=-1) * ramp1d(sizeX, 50, 220).reshape(1, -1), axis=-1).real
     # If you want to switch axes, in case of a 2d image, set axis=-2 to both fft and ifft 
     # and flip the position of arguments of reshape.
@@ -70,30 +39,16 @@ def ramp1d(size, crowtherFreq=None, radiusCutoff=None):
     
     # Circular cut (if radiusCutoff is None, no cut)
     radiusCutoff = radiusCutoff or nyquist * 2
-    ramp[radius >= radiusCutoff] = 0
+    ramp[radius > radiusCutoff] = 0
     return np.fft.fftshift(ramp)
 
 
-def hannFilter(size):
+def circular2d(sizeX, sizeY, radiusCutoff=None):
     """
-    Hann filter as implemented in Radontea package
-    https://github.com/RI-imaging/radontea/blob/01fb924b2a241914328c6526ced7248807f3adea/radontea/_alg_bpj.py#L138
+    Implementation of a 2D circular filter. 
+    Returns fftshifted filter (high-frequencies in the center).
+    Every value inside the radiusCutoff is 1 and the rest is 0.
     """
-    kx = 2 * np.pi * np.abs(np.fft.fftfreq(int(size)))  # ramp
-    kx[1:] = kx[1:] * (1 + np.cos(kx[1:])) / 2 # hann
-    return kx
-
-
-def rampShrec(sizeX, sizeY, crowtherFreq=None, radiusCutoff=None):
-    """
-    Filter like in SHREC
-    """
-    ramp = ramp1d(sizeX, crowtherFreq, radiusCutoff=None)
-    ramp = np.broadcast_to(ramp, sizeX, sizeY)
-    return ramp * circularFilter(sizeX, sizeY, radiusCutoff)
-
-
-def circularFilter(sizeX, sizeY, radiusCutoff=None):
     # Centered grids
     shape = np.array([sizeX, sizeY])
     ii = np.abs(np.indices(shape) - (shape // 2).reshape(2, 1, 1))
@@ -101,5 +56,90 @@ def circularFilter(sizeX, sizeY, radiusCutoff=None):
     f = np.ones(shape)
     nyquist = np.max([sizeX, sizeY]) / 2
     radiusCutoff = radiusCutoff or nyquist
-    f[radius >= radiusCutoff] = 0
+    f[radius > radiusCutoff] = 0
     return np.fft.fftshift(f)
+
+
+def gauss2d(sizeX, sizeY, sigma, radiusCutoff=None):
+    """
+    Function to mimic the 'fspecial' gaussian MATLAB function.
+    Adjusted from: https://stackoverflow.com/a/27928469/8691571
+    
+    Implementation of a 2D Gaussian filter. 
+    Returns fftshifted filter (high-frequencies in the center).
+    """
+    x, y = np.mgrid[-sizeX // 2 + 1:sizeX // 2 + 1, 
+                    -sizeY // 2 + 1:sizeY // 2 + 1]
+    
+    out = np.fft.fftshift(np.exp(-((x ** 2 + y ** 2) / (2.0 * sigma ** 2))))
+
+    # Circular cut (if radiusCutoff is None, no cut)
+    if radiusCutoff is not None:
+        c = circular2d(sizeX, sizeY, radiusCutoff=radiusCutoff)
+        out *= c
+    
+    return out
+
+
+########################################################
+# Filters made by a products of previous simpler filters
+########################################################
+
+
+def rampShrec(sizeX, sizeY, crowtherFreq=None, radiusCutoff=None):
+    """
+    Filter SHREC claimed to have used, but it seems it is not
+    what they actually used, therefore we implemented `approxShrec`.
+    Returns fftshifted filter (high-frequencies in the center).
+    """
+    ramp = ramp1d(sizeX, crowtherFreq, radiusCutoff=None)
+    ramp = np.broadcast_to(ramp, sizeX, sizeY)
+    return ramp * circular2d(sizeX, sizeY, radiusCutoff)
+
+
+def approxShrec(sizeX, sizeY):
+    """
+    This is a filter made by a product of 2D gaussian filter
+    with 1D ramp filter broadcasted to 2D and 2D circular filter.
+    Returns fftshifted filter (high-frequencies in the center).
+    
+    This filter is a reverse-engineered filter from SHREC21.
+    A bit odd constant `g_lift` was added to better match the 
+    frequency spectrum of SHREC21 reconstructions. The filter
+    in SHREC21 is probably a bit different, but this is as close
+    as we could get without seeing the source code and config.
+    ¯\_(ツ)_/¯
+    """
+
+    # Important if sizeX != sizeY
+    size = max(sizeX, sizeY)
+    nyquist = size // 2
+    
+    # Empirically estimated config based on a visualization
+    # of a SHREC reconstruction in real & Fourier spaces
+    sigma = size // 5
+    g_lift = 0.2
+    f_crowtherFreq = sigma * 2
+    
+    # 2D Gaussian filter shifted up by `g_lift`
+    # Range from `g_lift` to 1 + `g_lift`
+    g = gauss2d(size, size, sigma=sigma) + g_lift
+    
+    # 1D ramp filter broadcasted to 2D
+    # Range from 0 to 1
+    f = ramp1d(size, crowtherFreq=f_crowtherFreq)
+    f = np.broadcast_to(f, (size, size))
+    
+    # Circular filter
+    # Only zeros and ones
+    c = circular2d(size, size, radiusCutoff=nyquist)
+
+    # Filter
+    # Range from 0 to ?
+    out = f * g * c
+    out /= out.max()  # Forcing to range from 0 to 1
+    
+    # Slice to desired shape anchored to center
+    xs, ys = (size - sizeX) // 2, (size - sizeY) // 2
+    xe, ye = xs + sizeX, ys + sizeY
+    return out[xs:xe, ys:ye]

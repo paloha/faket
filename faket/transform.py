@@ -6,7 +6,7 @@ from .data import get_theta_from_alignment, slice_to_valid
 from .data import downsample_sinogram_space
 from .data import downsample_sinogram_theta
 from .data import match_mean_std, normalize, get_clim
-from .filter import ramp2d, rampShrec
+from .filter import approxShrec
 
 def reconstruct_mrc(**kwargs):
     """
@@ -61,10 +61,10 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
         Order (0 - 5) of the spline interpolation during downsampling.
     filtering: str, default='ramp'
         Filter used during reconstruction with FBP algorithm.
-        Accepts `ramp2d`, `shrecRamp`, and filters from radontea,
+        Accepts `approxShrec`, and filters from radontea,
         'ramp', 'shepp-logan', 'cosine', 'hamming', or 'hann'.
     filterkwargs: dict
-        Additional kwargs for `ramp2d` or `shrecRamp` filters.
+        Additional kwargs for `approxShrec` filter.
     z_valid: 2-tuple, default=None (no slicing)
         Slices the reconstruction along the 0-axis (Z dimension)
         to a range of valid voxels given by a relative interval from 0 to 1. 
@@ -92,14 +92,10 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
         sinogram = downsample_sinogram_space(sinogram, downsample_pre, order)
         print(f'-- Downsampled in space | Sinogram shape: {sinogram.shape}')
 
-    # Manual filtering
-    if filtering == 'ramp2d':
+    # Custom filtering
+    if filtering == 'approxShrec':
         sizeX, sizeY = sinogram.shape[1:]
-        sinogram = ifft2(fft2(sinogram) * ramp2d(sizeX, sizeY, **filterkwargs)).real
-        filtering = None  # Turning off radontea filtering
-    elif filtering == 'shrecRamp':
-        sizeX, sizeY = sinogram.shape[1:]
-        sinogram = ifft2(fft2(sinogram) * rampShrec(sizeX, sizeY, **filterkwargs)).real
+        sinogram = ifft2(fft2(sinogram) * approxShrec(sizeX, sizeY, **filterkwargs)).real
         filtering = None  # Turning off radontea filtering            
 
     # On a consumer-grade Intel® Core™ i7-8565U CPU @ 1.80GHz × 8
