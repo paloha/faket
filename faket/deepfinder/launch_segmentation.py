@@ -17,6 +17,8 @@ if __name__ == '__main__':
     parser.add_argument("--num_epochs", type=str, help="number of epochs deep finder was trained")
     parser.add_argument("--DF_weights_path", type=str, help="path to trained weights of deep finder")
     parser.add_argument("--out_path", type=str, help="out path for the mrc file resulting from segmentation")
+    parser.add_argument('--overwrite', action='store_true',  # If not provided, means False
+                        help='If specified, overwrites previously computed results.')
     args = parser.parse_args()
 
     # Tensorflow specific env variables
@@ -30,6 +32,10 @@ if __name__ == '__main__':
     identifier_fname = f'epoch{int(args.num_epochs):03d}_2021_model_{args.test_tomo_idx}_{args.test_tomogram}'
     labelmap_file_name = pj(args.out_path, f'{identifier_fname}_bin1_labelmap.mrc')  # No binning
     labelmapB_file_name = pj(args.out_path, f'{identifier_fname}_bin2_labelmap.mrc')  # 2x binned
+    
+    if os.path.exists(labelmap_file_name) and not args.overwrite:
+        print(f'Already computed! --overwrite not specified, so skipping: {labelmap_file_name}')
+        exit(0)  # Success return code
 
     Nclass = 16
     patch_size = 160 # must be multiple of 4
