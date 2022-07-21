@@ -20,30 +20,30 @@
 name: faket
 dependencies:
   - python=3.9
-  - cudatoolkit=11.3                                    # GPU
-  - cudnn=8.2                                           # GPU
-  - conda-forge::tensorflow-gpu=2.6                     # DF  
-  - keras=2.6                                           # DF
-  - pytorch::pytorch=1.10                               # NST
-  - pytorch::torchvision=0.11                           # NST
-  - scikit-learn>=0.23,<1.0                             # DF + Faket
-  - scikit-image>=0.15                                  # DF + NST
-  - numpy>=1.19                                         # DF + NST
-  - matplotlib>=3.1                                     # DF + NST
-  - pillow>=8.0.0                                       # NST
-  - tqdm>=4.46.0                                        # NST
-  - jupyterlab>=3.2                                     # Faket
-  - nbclassic>=0.2.8                                    # Faket
-  - ipywidgets>=7.6                                     # Faket
+  - cudatoolkit=11.3                                        # GPU
+  - cudnn=8.2                                               # GPU
+  - conda-forge::tensorflow-gpu=2.6                         # DF  
+  - keras=2.6                                               # DF
+  - pytorch::pytorch=1.10                                   # NST
+  - pytorch::torchvision=0.11                               # NST
+  - scikit-learn>=0.23,<1.0                                 # DF + Faket
+  - scikit-image>=0.15                                      # DF + NST
+  - numpy>=1.19                                             # DF + NST
+  - matplotlib>=3.1                                         # DF + NST
+  - pillow>=8.0.0                                           # NST
+  - tqdm>=4.46.0                                            # NST
+  - jupyterlab>=3.2                                         # Faket
+  - nbclassic>=0.2.8                                        # Faket
+  - ipywidgets>=7.6                                         # Faket
   - pip>=21.2
   - pip:
-    - lxml>=4.3.4                                       # DF
-    - mrcfile>=1.1.2                                    # DF
-    - pyqt5>=5.13.2                                     # DF
-    - pyqtgraph>=0.10.0                                 # DF
-    - openpyxl>=3.0.3                                   # DF
-    - radontea>=0.4.9                                   # Faket
-    - git+https://gitlab.com/paloha/gpuMultiprocessing  # Faket
-    - seaborn>=0.11.2                                   # SHREC eval
-    - scikit-plot>=0.3.7                                # SHREC eval
-    - pycm>=3.4                                         # SHREC eval
+    - lxml>=4.3.4                                           # DF
+    - mrcfile>=1.1.2                                        # DF
+    - pyqt5>=5.13.2                                         # DF
+    - pyqtgraph>=0.10.0                                     # DF
+    - openpyxl>=3.0.3                                       # DF
+    - radontea>=0.4.9                                       # Faket
+    - git+https://gitlab.com/paloha/gpuMultiprocessing.git  # Faket
+    - seaborn>=0.11.2                                       # SHREC eval
+    - scikit-plot>=0.3.7                                    # SHREC eval
+    - pycm>=3.4                                             # SHREC eval
