@@ -102,6 +102,8 @@ if __name__ == '__main__':
             ferr = open(errlog, 'w')
             sys.stderr = ferr
             #####################################################
+
+            print("Initializing clustering task")
     
             # Initialize clustering task:
             clust = Cluster(clustRadius=5)

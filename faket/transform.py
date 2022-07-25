@@ -95,6 +95,7 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
     # Custom filtering
     if filtering == 'approxShrec':
         sizeX, sizeY = sinogram.shape[1:]
+        filterkwargs = filterkwargs or {}
         sinogram = ifft2(fft2(sinogram) * approxShrec(sizeX, sizeY, **filterkwargs)).real
         filtering = None  # Turning off radontea filtering            
 
