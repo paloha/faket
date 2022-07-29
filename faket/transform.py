@@ -1,6 +1,8 @@
 from radontea import backproject_3d
 import numpy as np
 from numpy.fft import fft2, ifft2
+from .data import fix_edges_projections
+from .data import fix_edges_reconstruction
 from .data import load_mrc, save_mrc, save_conf
 from .data import get_theta_from_alignment, slice_to_valid
 from .data import downsample_sinogram_space
@@ -37,7 +39,8 @@ def reconstruct_mrc(**kwargs):
 
 def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1, 
                 downsample_post=1, order=3, filtering='ramp', filterkwargs=None,
-                z_valid=None, output_mrc=None, ncpus=None):
+                z_valid=None, output_mrc=None, ncpus=None, 
+                fix_edges_proj=0, fix_edges_rec=0):
     """
     Uses radontea package 3D filtered backprojection to
     reconstruct the provided sinogram measured at theta.
@@ -74,6 +77,10 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
     ncpus: int, default=None
         Number of CPUs used to do the reconstruction. If None, the number
         is set automatically to all CPUs. 
+    fix_edges_proj: int, default=0
+        Fixing artifacts in SHREC baseline projections.
+    fix_edges_rec: int, default=0
+        Fixing artifacts in SHREC baseline reconstructions.
     """
     
     
@@ -91,6 +98,9 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
     if downsample_pre > 1:
         sinogram = downsample_sinogram_space(sinogram, downsample_pre, order)
         print(f'-- Downsampled in space | Sinogram shape: {sinogram.shape}')
+    
+    # Fixing artifacts in projection space if necessary
+    sinogram = fix_edges_projections(sinogram, n=fix_edges_proj)
 
     # Custom filtering
     if filtering == 'approxShrec':
@@ -121,6 +131,9 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
         reconstruction = zoom(reconstruction, (ratio, ratio, ratio), order=order)
         print(f'-- Downsampled in space | Reconstruction shape: {reconstruction.shape}')
 
+    # Fixing artifacts in reconstruction space if necessary
+    reconstruction = fix_edges_reconstruction(reconstruction, n=fix_edges_rec)
+        
     # Saving the reconstructed volume into an mrc file
     if output_mrc is not None:
         save_mrc(reconstruction.astype(np.float32), output_mrc, overwrite=True)

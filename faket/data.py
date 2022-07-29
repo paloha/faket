@@ -167,3 +167,42 @@ def downsample_sinogram_space(sinogram, n, order):
     """
     from scipy.ndimage import zoom
     return zoom(sinogram, (1.0, 1 / n, 1 / n), order=order)
+
+
+def fix_edges_projections(projections, n=0):
+    """
+    In projections and projections_unbinned provided by SHREC, 
+    for unknown reason, there are edge artifacts in the first few
+    columns and last few columns of every tilt. The mean of the 
+    column is shifted which causes a horizontal stripe through
+    origin in fourier space after filtering. To fix this issue
+    without cropping the projections we decided to match the
+    mean of first frew columns with the mean of nth column.
+    Same from the other side but mirrored.
+    """
+    if n == 0:
+        return projections
+    p = projections.copy()
+    end = p.shape[2]
+    for i in range(n):
+        p[:,:,i:i+1] -= (
+            np.expand_dims(p[:,:,i:i+1].mean(axis=1), axis=1) - 
+            np.expand_dims(p[:,:,n:n+1].mean(axis=1), axis=1))
+        p[:,:,end-i-1:end-i] -= (
+            np.expand_dims(p[:,:,end-i-1:end-i].mean(axis=1), axis=1) - 
+            np.expand_dims(p[:,:,end-n-1:end-n].mean(axis=1), axis=1))
+    return p
+
+
+def fix_edges_reconstruction(reconstruction, n=0):
+    """
+    SHREC attenuates edges of reconstruction. Without it, the 
+    reconstructon in Fourier space has a pronounced horizontal
+    stripe through origin. Even after fixing edges of projections.
+    """
+    if n == 0:
+        return reconstruction
+    z, y, x = reconstruction.shape
+    reconstruction[:,:n,:] *= (np.arange(n) / n).reshape(1, -1, 1)
+    reconstruction[:,y-n:,:] *= (np.arange(n)[::-1] / n).reshape(1, -1, 1)
+    return reconstruction
