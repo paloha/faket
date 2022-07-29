@@ -36,7 +36,7 @@ def reconstruct_mrc(**kwargs):
 
 
 def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1, 
-                downsample_post=1, order=3, filtering='ramp', filterkwargs=None, 
+                downsample_post=1, order=3, filtering='ramp', filterkwargs=None,
                 z_valid=None, output_mrc=None, ncpus=None):
     """
     Uses radontea package 3D filtered backprojection to
@@ -236,6 +236,3 @@ def noise_projections(input_mrc, style_mrc, output_mrc, mean=0.0, std=0.4, clip_
     
     # Save output
     save_mrc(volume_noisy.astype(np.float32), output_mrc, overwrite=True)
-    
-    
-    

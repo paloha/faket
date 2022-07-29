@@ -34,7 +34,7 @@ def ramp1d(size, crowtherFreq=None, radiusCutoff=None):
     assert unit <= nyquist, f'Max crowtherFreq is nyquist {nyquist}.'
     
     # Filter
-    ramp =  radius / unit
+    ramp = radius / unit
     ramp[ramp > 1] = 1
     
     # Circular cut (if radiusCutoff is None, no cut)
@@ -56,22 +56,24 @@ def circular2d(sizeX, sizeY, radiusCutoff=None):
     f = np.ones(shape)
     nyquist = np.max([sizeX, sizeY]) / 2
     radiusCutoff = radiusCutoff or nyquist
-    f[radius > radiusCutoff] = 0
+    f[radius >= radiusCutoff + 1] = 0
     return np.fft.fftshift(f)
 
 
-def gauss2d(sizeX, sizeY, sigma, radiusCutoff=None):
+def gauss2d(sizeX, sizeY, sigmaX, sigmaY, radiusCutoff=None):
     """
-    Function to mimic the 'fspecial' gaussian MATLAB function.
-    Adjusted from: https://stackoverflow.com/a/27928469/8691571
+    Adjusted from: 
+    https://stackoverflow.com/a/27928469/8691571
+    https://stackoverflow.com/a/56923189/8691571
     
     Implementation of a 2D Gaussian filter. 
     Returns fftshifted filter (high-frequencies in the center).
     """
-    x, y = np.mgrid[-sizeX // 2 + 1:sizeX // 2 + 1, 
+    y, x = np.mgrid[-sizeX // 2 + 1:sizeX // 2 + 1, 
                     -sizeY // 2 + 1:sizeY // 2 + 1]
     
-    out = np.fft.fftshift(np.exp(-((x ** 2 + y ** 2) / (2.0 * sigma ** 2))))
+    out = np.fft.fftshift(
+        np.exp(-(x ** 2. / (2. * sigmaX ** 2.) + y ** 2. / (2. * sigmaY ** 2.))))
 
     # Circular cut (if radiusCutoff is None, no cut)
     if radiusCutoff is not None:
@@ -117,13 +119,14 @@ def approxShrec(sizeX, sizeY):
     
     # Empirically estimated config based on a visualization
     # of a SHREC reconstruction in real & Fourier spaces
-    sigma = size // 5
-    g_lift = 0.2
-    f_crowtherFreq = sigma * 2
+    sigmaX = int(0.34 * size)
+    sigmaY = int(0.20 * size)
+    g_lift = 0.33
+    f_crowtherFreq = int(0.61 * nyquist)
     
     # 2D Gaussian filter shifted up by `g_lift`
     # Range from `g_lift` to 1 + `g_lift`
-    g = gauss2d(size, size, sigma=sigma) + g_lift
+    g = gauss2d(size, size, sigmaX, sigmaY) + g_lift
     
     # 1D ramp filter broadcasted to 2D
     # Range from 0 to 1
