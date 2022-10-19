@@ -84,7 +84,7 @@ def gauss2d(sizeX, sizeY, sigmaX, sigmaY, radiusCutoff=None):
 
 
 ########################################################
-# Filters made by a products of previous simpler filters
+# Filters made from products of previous simpler filters
 ########################################################
 
 

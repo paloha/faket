@@ -22,7 +22,9 @@ def save_mrc(data, path, overwrite=False):
     Saves the data into a mrc file.
     """
     import mrcfile
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    dirname = os.path.dirname(path)
+    if dirname != '':
+        os.makedirs(dirname, exist_ok=True)
     with mrcfile.new(path, overwrite=overwrite) as mrc:
         mrc.set_data(data)
 
@@ -147,6 +149,15 @@ def normalize(x):
     n /= n.max()
     return n
 
+
+def standardize(x):
+    """
+    Standardizes an array to mean 0 and variance 1.
+    """
+    x -= x.mean()
+    x /= x.std()
+    return x
+
     
 def downsample_sinogram_theta(sinogram, theta, step):
     """
@@ -155,7 +166,7 @@ def downsample_sinogram_theta(sinogram, theta, step):
     0 tilt is assumed to be the middle tilt in theta. 
     See 'theta_subsampled_indices' for more info.
     """
-    indices = theta_subsampled_indices(len(theta), step)    
+    indices = theta_subsampled_indices(len(theta), step)
     return sinogram[indices], theta[indices]
     
     

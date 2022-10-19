@@ -1,5 +1,8 @@
-from radontea import backproject_3d
+import os
+import time
 import numpy as np
+from shutil import which
+import subprocess
 from numpy.fft import fft2, ifft2
 from .data import fix_edges_projections
 from .data import fix_edges_reconstruction
@@ -9,6 +12,8 @@ from .data import downsample_sinogram_space
 from .data import downsample_sinogram_theta
 from .data import match_mean_std, normalize, get_clim
 from .filter import approxShrec
+from radontea import backproject_3d
+
 
 def reconstruct_mrc(**kwargs):
     """
@@ -40,7 +45,7 @@ def reconstruct_mrc(**kwargs):
 def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1, 
                 downsample_post=1, order=3, filtering='ramp', filterkwargs=None,
                 z_valid=None, output_mrc=None, ncpus=None, 
-                fix_edges_proj=0, fix_edges_rec=0):
+                fix_edges_proj=0, fix_edges_rec=0, software='radontea'):
     """
     Uses radontea package 3D filtered backprojection to
     reconstruct the provided sinogram measured at theta.
@@ -62,10 +67,11 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
         Reconstruction downsampling in all space dimensions with int step.
     order: int, default=3
         Order (0 - 5) of the spline interpolation during downsampling.
-    filtering: str, default='ramp'
+    filtering: str or None, default=None
         Filter used during reconstruction with FBP algorithm.
-        Accepts `approxShrec`, and filters from radontea,
-        'ramp', 'shepp-logan', 'cosine', 'hamming', or 'hann'.
+        Accepts `approxShrec`, and in case `software='radontea'` accepts
+        also filters from radontea {'ramp', 'shepp-logan', 'cosine', 
+        'hamming', 'hann'}.
     filterkwargs: dict
         Additional kwargs for `approxShrec` filter.
     z_valid: 2-tuple, default=None (no slicing)
@@ -75,16 +81,23 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
         Path to the output mrc file. If None, no saving is done and
         reconstruction is just returned instead.
     ncpus: int, default=None
-        Number of CPUs used to do the reconstruction. If None, the number
-        is set automatically to all CPUs. 
+        If `software='radontea'` this is the number of CPUs used to do
+        the reconstruction. If None, the number is set automatically 
+        to all CPUs. Ignored if `software='imod'`. 
     fix_edges_proj: int, default=0
-        Fixing artifacts in SHREC baseline projections.
+        Fixing artifacts as in SHREC baseline projections.
     fix_edges_rec: int, default=0
-        Fixing artifacts in SHREC baseline reconstructions.
+        Fixing artifacts as in SHREC baseline reconstructions.
+    software: str, one of {'radontea', 'imod'}, default 'radontea'
+        Specifies which software is used to do the reconstruction. 
+        If 'imod', CLI program `tilt` from IMOD must be installed and
+        available on PATH and executable.
     """
     
     
     print(f'-- Sinogram shape: {sinogram.shape}' )
+    
+    theta = np.asarray(theta)
 
     # Downsample in theta dimension such that the 0° angle is 
     # always present and the other angles are centered around it.
@@ -109,17 +122,24 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
         sinogram = ifft2(fft2(sinogram) * approxShrec(sizeX, sizeY, **filterkwargs)).real
         filtering = None  # Turning off radontea filtering            
 
-    # On a consumer-grade Intel® Core™ i7-8565U CPU @ 1.80GHz × 8
-    # Reconstructing one sinogram 61x512x512 into volume 512x512x512 using 8 cpus takes ~60 seconds.
-    # Reconstructing one sinogram 61x1024x1024 into volume 1024x1024x1024 using 8 cpus takes ~10 minutes.
-    reconstruction = backproject_3d(sinogram, np.deg2rad(theta), 
-                                    filtering=filtering, weight_angles=False, 
-                                    padding=False, padval=None, ncpus=ncpus)[::-1,:,:]
+    if software == 'radontea':
+        # On a consumer-grade Intel® Core™ i7-8565U CPU @ 1.80GHz × 8
+        # Reconstructing one sinogram 61x512x512 into volume 512x512x512 using 8 cpus takes ~60 seconds.
+        # Reconstructing one sinogram 61x1024x1024 into volume 1024x1024x1024 using 8 cpus takes ~10 minutes.
+        reconstruction = backproject_3d(sinogram, np.deg2rad(theta), 
+                                        filtering=filtering, weight_angles=False, 
+                                        padding=False, padval=None, ncpus=ncpus)[::-1,:,:]
+    elif software == 'imod':
+        if filtering is not None:
+            raise ValueError('')
+        reconstruction = backproject_3d_imod(sinogram, theta, z_valid)
+    else:
+        raise NotImplementedError('Supported choices for software are {"radontea", "imod"}')
 
     print(f'-- Reconstructed using FBP | Reconstruction shape: {reconstruction.shape}')
 
     # Slice the reconstruction to a valid region
-    if z_valid is not None:
+    if z_valid is not None and software != 'imod':
         reconstruction = slice_to_valid(reconstruction, *z_valid)
         print(f'-- Sliced Z dimension to valid region | Reconstruction shape: {reconstruction.shape}')
 
@@ -141,7 +161,62 @@ def reconstruct(sinogram, theta, downsample_angle=1, downsample_pre=1,
     else:
         return reconstruction.astype(np.float32)
 
-
+    
+def backproject_3d_imod(sinogram, theta, z_valid=None, cutoff=None, sigma=None):
+    """
+    Reconstructs a 3D volume from sinogram measurements using IMOD tilt program.
+    https://bio3d.colorado.edu/imod/betaDoc/man/tilt.html
+    
+    This function creates two temporary files that are deleted at the end.
+    One is for sinogram data that needs to be passed to tilt as a file.
+    One is for reconstruction which tilt program creates and we load to RAM.
+    """
+    
+    # Make sure IMOD titl CLI program is available
+    assert which('tilt') is not None, 'Please install IMOD and make sure tilt program is in PATH.'
+    
+    # Tilt angles in tilt program friendly format
+    angles = ' '.join(map(str, theta))
+    
+    # Computing the desired thickness of the reconstruction
+    M = sinogram.shape[-1]
+    thickness = round((z_valid[1] - z_valid[0]) * M) if z_valid is not None else M
+    
+    # Config of radial filtering (first value is cutoff, second value is falloff or sigma (when -FalloffIsTrueSigma is set)
+    # We wanted to turn off this completely, but it seems not to be possible, this is as close as it gets:
+    # - Setting cutoff to 0.5 does not turn off low-pass filtering as the docs say, so we set it to 1px (0px is invalid)
+    # - Setting sigma to <1.0000 filters high frequencies, to >1.000 does not change the output so we keep 1.000 set using n pixels
+    # - The final setting of RADIAL is: `-RADIAL "1 512" -FalloffIsTrueSigma` if M == 512
+    cutoff = 1 if cutoff is None else cutoff
+    sigma = M if sigma is None else sigma
+    radial = f'{cutoff} {sigma}'
+    
+    # Use temporary mrc files so the subprocess can read input and write output
+    tmp_id = time.time()
+    tmp_projections_fname = f'~tmp_projections_{tmp_id}.mrc'
+    tmp_reconstruction_fname = f'~tmp_reconstruction_{tmp_id}.mrc'
+    save_mrc(sinogram.astype(np.float32), tmp_projections_fname)
+    try:
+        command = (
+            'tilt '
+            f'-input {tmp_projections_fname} '
+            f'-output {tmp_reconstruction_fname} '
+            f'-ANGLES "{angles}" '
+            f'-THICKNESS {thickness} '
+            f'-RADIAL "{radial}" '
+            f'-FalloffIsTrueSigma'
+        )
+        print('#######################', command)
+        return_code = subprocess.call(command, shell=True)
+        assert return_code == 0, 'Call to IMOD tilt failed.'
+        reconstruction = load_mrc(tmp_reconstruction_fname).swapaxes(0, 1)
+    finally:
+        os.remove(tmp_projections_fname)
+        os.remove(tmp_reconstruction_fname)
+            
+    return reconstruction
+    
+    
 def radon_3d(volume, theta, ncpus=None, dose=None, out_shape=None, circle=False, slice_axis=0):
     """
     volume: 3D np array (X, Y, Z)
