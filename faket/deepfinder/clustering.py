@@ -10,8 +10,8 @@ import time
 
 from sklearn.cluster import MeanShift
 
-from utils import objl as ol
-from utils import core
+from .utils import objl as ol
+from .utils import core
 
 
 class Cluster(core.DeepFinder):
