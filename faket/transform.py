@@ -206,7 +206,6 @@ def backproject_3d_imod(sinogram, theta, z_valid=None, cutoff=None, sigma=None):
             f'-RADIAL "{radial}" '
             f'-FalloffIsTrueSigma'
         )
-        print('#######################', command)
         return_code = subprocess.call(command, shell=True)
         assert return_code == 0, 'Call to IMOD tilt failed.'
         reconstruction = load_mrc(tmp_reconstruction_fname).swapaxes(0, 1)
