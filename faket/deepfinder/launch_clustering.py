@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import argparse
+import numpy as np
 from .utils import objl as ol
 from .utils import common as cm
 from .clustering import Cluster
@@ -53,10 +54,23 @@ def launch_clustering(test_tomogram, test_tomo_idx, num_epochs, label_map_path,
     
     # As macromolecules have different size, each class has its own size threshold (for removal).
     # The thresholds have been determined on the validation set.
+    
+    #####################################################
+    # FakET:
+    # Original DeepFinder code for SHREC19 data set had the following thr_list values:
+    # (from https://gitlab.inria.fr/serpico/deep-finder/-/blob/v1.0/examples/analyze/step2_launch_clustering.py)
+    # thr_list = [50, 100, 20, 100, 50, 100, 100, 50, 50, 20, 300, 300]
+    # However, from SHREC19 to SHREC21 the particles have changed & there is no code available for the DeepFidner
+    # results on SHREC21. Therefore, there is also no info on thresholds. Moreover, it is not documented how exactly 
+    # they determined the thresholds on the validation set. Therefore, we just set all thresholds (except the
+    # background and excluded particles (such as 4V94 & vesicle) to 1% of the particle volume in nm3.
+    
+    # Particles in SHREC21
     # background 0, 4V94 1, 4CR2 2, 1QVR 3, 1BXN 4, 3CF3 5, 1U6G 6, 3D2F 7, 2CG9 8, 
     # 3H84 9, 3GL1 10, 3QM1 11, 1S3X 12, 5MRC 13, vesicle 14, fiducial 15
-    lbl_list = [1,    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,   15]
-    thr_list = [1000, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1,  1000, 1]  # FakET all to 1
+    lbl_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]     
+    thr_list = [5000, 5000, 27, 14, 10, 11, 5, 5, 4, 3, 2, 1, 1, 64, 5000, 5]  # ~1% of volume
+    #####################################################
 
     # Load data:
     labelmapB = cm.read_array(labelmap_path)
@@ -110,6 +124,8 @@ def launch_clustering(test_tomogram, test_tomo_idx, num_epochs, label_map_path,
                 if os.path.isfile(log) and os.path.getsize(log) == 0:
                     os.remove(log)
     else:
+        print("Applying thresholding")
+        
         # Load raw_path from xml file instead of computing it
         objlist = ol.read_xml(raw_path)
         

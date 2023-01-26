@@ -273,53 +273,54 @@ def radon_3d(volume, theta, ncpus=None, dose=None, out_shape=None, circle=False,
     return sinogram  # Output shape (θ, slice_axis, M)
 
 
-def noise_projections(input_mrc, style_mrc, output_mrc, mean=0.0, std=0.4, clip_outliers=(0.0, 1.0), seed=0):
-    """
-    Adds Gaussian noise of specified mean and std to input_mrc which is then 
-    rescaled per tilt to match the mean and std of the tilts in style mrc.
+# DEPRECATED
+# def noise_projections(input_mrc, style_mrc, output_mrc, mean=0.0, std=0.4, clip_outliers=(0.0, 1.0), seed=0):
+#     """
+#     Adds Gaussian noise of specified mean and std to input_mrc which is then 
+#     rescaled per tilt to match the mean and std of the tilts in style mrc.
     
-    Parameters
-    ----------
-    input_mrc: str
-        Path to a mrc file containig noiseless projections.
-    style_mrc: str
-        Path to a mrc file containig style projections. Ideally a real sinogram 
-        from the data set on which we want to later predict.
-    output_mrc: str
-        Path to a mrc file where the result is going to be stored.
-    mean: float, default=0.0
-        Mean of the Gaussian noise.
-    std: float, default=0.4
-        Standard deviation of the Gaussian noise.
-    clip_outliers: 2-tuple of floats, default=(0.0, 1.0)
-        Clip data outside of the specified portion.
-    seed: 
-        Random seed used to generate the noise.
-    """
+#     Parameters
+#     ----------
+#     input_mrc: str
+#         Path to a mrc file containig noiseless projections.
+#     style_mrc: str
+#         Path to a mrc file containig style projections. Ideally a real sinogram 
+#         from the data set on which we want to later predict.
+#     output_mrc: str
+#         Path to a mrc file where the result is going to be stored.
+#     mean: float, default=0.0
+#         Mean of the Gaussian noise.
+#     std: float, default=0.4
+#         Standard deviation of the Gaussian noise.
+#     clip_outliers: 2-tuple of floats, default=(0.0, 1.0)
+#         Clip data outside of the specified portion.
+#     seed: 
+#         Random seed used to generate the noise.
+#     """
     
-    # Load input projections
-    volume = load_mrc(input_mrc)
-    style = load_mrc(style_mrc)
+#     # Load input projections
+#     volume = load_mrc(input_mrc)
+#     style = load_mrc(style_mrc)
     
-    # Generate random noise
-    rng = np.random.default_rng(seed=seed)
-    noise = rng.normal(loc=mean, scale=std, 
-                       size=volume.size).reshape(volume.shape)
+#     # Generate random noise
+#     rng = np.random.default_rng(seed=seed)
+#     noise = rng.normal(loc=mean, scale=std, 
+#                        size=volume.size).reshape(volume.shape)
     
-    # Scaling per tilt based on style (bigger the abs(angle), longer the trajectory)
-    volume  = match_mean_std(volume, style)  
+#     # Scaling per tilt based on style (bigger the abs(angle), longer the trajectory)
+#     volume  = match_mean_std(volume, style)  
     
-    # Scale between [0, 1] before adding the noise
-    volume = normalize(volume)  
+#     # Scale between [0, 1] before adding the noise
+#     volume = normalize(volume)  
     
-    # Add the noise
-    volume_noisy = volume + noise
+#     # Add the noise
+#     volume_noisy = volume + noise
     
-    # Remove outliers
-    volume_noisy = np.clip(volume_noisy, *get_clim(volume_noisy, *clip_outliers)) 
+#     # Remove outliers
+#     volume_noisy = np.clip(volume_noisy, *get_clim(volume_noisy, *clip_outliers)) 
     
-    # Scale back (per tilt) to match style
-    volume_noisy = match_mean_std(volume_noisy, style)  
+#     # Scale back (per tilt) to match style
+#     volume_noisy = match_mean_std(volume_noisy, style)  
     
-    # Save output
-    save_mrc(volume_noisy.astype(np.float32), output_mrc, overwrite=True)
+#     # Save output
+#     save_mrc(volume_noisy.astype(np.float32), output_mrc, overwrite=True)

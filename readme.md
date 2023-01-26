@@ -36,6 +36,5 @@ For even more info go to [shrec webpage](https://www.shrec.net/cryo-et/) or [DOI
 
 ## Run `main.ipynb`
 
-To reproduce all the results presented in the paper, just activate the conda environment created in Section Install and run all the cells within the `main.ipynb` using e.g. JupyterLab (which is already available in the Conda environment).
-Please note, that creating the data modalities is going to be reasonably fast, but it will take a lot of time to run all the evaluation experiments using the DeepFinder.
+To reproduce all the results presented in the paper, just activate the conda environment created in Section Install and run all the cells within the `main.ipynb` using e.g. JupyterLab (which is already available in the Conda environment). Please note, that creating the data modalities is going to be reasonably fast, but it will take a lot of time to run all the evaluation experiments using the DeepFinder.
 

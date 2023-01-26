@@ -214,7 +214,7 @@ if __name__ == '__main__':
         predicted_particle_classes = np.asarray(  # If in excluded, prediction is set to 0 (background)
             [pdb2num[p[0][0]] if (p and p[0][0] not in excluded) else 0 
                  for p in found_particles[1:]], 
-            dtype=int)  # taking the first occurrence only (FakET comment: WHY the first?)
+            dtype=int)  # taking the first occurrence only (FakET comment: could be extended to contain info on cluster size (not only distance))
         
         confusion_matrix = ConfusionMatrix(actual_vector=gt_particle_classes, predict_vector=predicted_particle_classes)
         confusion_matrix.relabel(num2pdb)

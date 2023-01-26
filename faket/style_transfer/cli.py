@@ -17,6 +17,7 @@ import torch.multiprocessing as mp
 from tqdm import tqdm
 import numpy as np
 import random
+import time
 
 # Changed by faket to fix imports in current project structure
 srgb_profile = (Path(__file__).resolve().parent / 'sRGB Profile.icc').read_bytes()
@@ -206,13 +207,14 @@ def main():
     p.add_argument('--style_layers', '-sl', type=int, nargs='+', default=None,
                    help='Indices of VGG conv layers features of which are used to compute the loss on style.')
     p.add_argument('--style_layers_weights', '-slw', type=int, nargs='+', default=None,
-                   help='Weight of each of the cstylelayers in the loss computation.')
+                   help='Weight of each of the style-layers in the loss computation.')
     p.add_argument('--content_layers', '-cl', type=int, nargs='+', default=None,
                    help='Indices of VGG conv layers features of which are used to compute the loss on content.')
     p.add_argument('--content_layers_weights', '-clw', type=int, nargs='+', default=None,
                    help='Weight of each of the content-layers in the loss computation.')
 
     args = p.parse_args()
+    start_time = time.time()
     
     # Reproducibility - added by FakET
     # run this script with PYTHONHASHSEED=0 python ...
@@ -368,7 +370,7 @@ def main():
         # Saving one image output
         if output_image[0] is not None:
             save_image(output_image_path, output_image[0])
-        
+    print(f'Duration: {(time.time() - start_time) / 60:.2f} minutes.')
     
 
 

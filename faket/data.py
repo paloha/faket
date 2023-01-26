@@ -118,45 +118,73 @@ def vol_to_valid(data_folder, N, fname, z_valid, out_fname=None):
     out_fname = out_fname or f'{fname}_valid.mrc'
     save_mrc(valid.astype(np.float32), os.path.join(data_folder, str(N), out_fname), overwrite=True)
     print(f'-- DONE slicing {fname} {N} to valid range and saving as mrc file.')
+
     
-    
-def match_mean_std(vol1, vol2): 
+def match_mean_std(vol1, vol2=None, means=None, stds=None): 
     """
-    Matches mean and std of all arrays
-    in vol1 according to mean and std
-    of respective arrays in vol2.
+    Matches mean and std of all arrays in vol1 according
+    to the mean and std of respective arrays in vol2 if
+    vol2 is not None, else to the means and stds arrays.
+    If vol2 is not None, means and stds are ignored.
     """
     n_tilts = vol1.shape[0]
-    assert n_tilts == vol2.shape[0]
     r = lambda x: x.reshape(n_tilts, -1)
     
+    if vol2 is None:
+        assert means is not None and stds is not None, \
+        'Either provide vol2 or means and stds arrays.'
+        
+        assert len(means) == len(stds) == n_tilts, \
+        'Length of means and stds must match vol1.shape[0].' 
+        
+        means = np.asarray(means).reshape(-1, 1, 1)
+        stds = np.asarray(stds).reshape(-1, 1, 1)
+    else:
+        assert n_tilts == vol2.shape[0], \
+        'Number of tilts in vol1 and vol2 must match.'
+    
     vol1s = r(vol1).std(-1).reshape(-1,1,1)
-    vol2s = r(vol2).std(-1).reshape(-1,1,1)
+    vol2s = stds if vol2 is None else r(vol2).std(-1).reshape(-1,1,1)
     vol1 = vol1 / vol1s * vol2s
     
     vol1m = r(vol1).mean(-1).reshape(-1,1,1)
-    vol2m = r(vol2).mean(-1).reshape(-1,1,1)
+    vol2m = means if vol2 is None else r(vol2).mean(-1).reshape(-1,1,1)
     vol1 -= (vol1m - vol2m)
     return vol1 
-
+    
 
 def normalize(x):
     """
     Shifts and scales an array into [0, 1]
     """
-    n = x.copy()
-    n -= n.min()
-    n /= n.max()
-    return n
+    x = x.copy()
+    x -= x.min()
+    x /= x.max()
+    return x
 
 
 def standardize(x):
     """
     Standardizes an array to mean 0 and variance 1.
     """
+    x = x.copy()
     x -= x.mean()
     x /= x.std()
     return x
+
+
+def standardize_per_tilt(x):
+    """
+    Standardizes an array to mean 0 and variance 1
+    along the first axis. I.e. in an array of shape
+    (61, 1024, 1024), each 1024x1024 subarray will
+    be standardized separately.
+    """
+    shape = x.shape
+    x = x.copy().reshape(shape[0], -1)
+    x -= x.mean(axis=-1).reshape(-1, 1)
+    x /= x.std(axis=-1).reshape(-1, 1)
+    return x.reshape(shape)
 
     
 def downsample_sinogram_theta(sinogram, theta, step):

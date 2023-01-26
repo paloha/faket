@@ -299,12 +299,24 @@ def above_thr(objlIN, thr):
 
 def above_thr_per_class(objlIN, lbl_list, thr_list):
     objlOUT = []
-    for lbl in lbl_list:
+    for lbl, thr in zip(lbl_list, thr_list):
         objl_class = get_class(objlIN, lbl)
-        objl_class = above_thr(objl_class, thr_list[lbl-1])
-        for p in range(len(objl_class)):
-            objlOUT.append(objl_class[p])
+        objl_class = above_thr(objl_class, thr)
+        objlOUT += objl_class
     return objlOUT
+
+# Faket we changed the implementation due to error prone function
+# thr_list[i] assumes lbl_list is always a range(1, N)
+# which does not have to be the case if we chagne the arrays
+# in launch_clustering.py
+# def above_thr_per_class(objlIN, lbl_list, thr_list):
+#     objlOUT = []
+#     for i, lbl in enumerate(lbl_list):
+#         objl_class = get_class(objlIN, lbl)
+#         objl_class = above_thr(objl_class, thr_list[i])
+#         for p in range(len(objl_class)):
+#             objlOUT.append(objl_class[p])
+#     return objlOUT
 
 # TODO check why np.round is used
 def scale_coord(objlIN, scale):
