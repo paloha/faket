@@ -21,7 +21,7 @@ class VGGFeatures(nn.Module):
     poolings = {'max': nn.MaxPool2d, 'average': nn.AvgPool2d, 'l2': partial(nn.LPPool2d, 2)}
     pooling_scales = {'max': 1., 'average': 2., 'l2': 0.78}
 
-    def __init__(self, layers, pooling='max'):
+    def __init__(self, layers, pooling='max', model_weights='pretrained'):
         super().__init__()
         self.layers = sorted(set(layers))
 
@@ -30,9 +30,16 @@ class VGGFeatures(nn.Module):
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                               std=[0.229, 0.224, 0.225])
 
-        # The PyTorch pre-trained VGG-19 has different parameters from Simonyan et al.'s original
-        # model.
-        self.model = models.vgg19(pretrained=True).features[:self.layers[-1] + 1]
+        # Right now only two options are available: pretrained or not
+        if model_weights == 'pretrained':
+            pretrained = True
+        elif model_weights == 'random':
+            pretrained = False
+        else:
+            raise NotImplementedError('Choose model_weights from {"pretrained", "random"}')
+        
+        # The PyTorch pre-trained VGG-19 has different parameters from Simonyan et al.'s original model.
+        self.model = models.vgg19(pretrained=pretrained).features[:self.layers[-1] + 1]
         self.devices = [torch.device('cpu')] * len(self.model)
 
         # Reduces edge artifacts.
@@ -274,7 +281,8 @@ class StyleTransfer:
     def __init__(self, devices=['cpu'], pooling='max', 
                  # Following parameters exposed in this constructor by FakET
                  style_layers=None, content_layers=None,
-                 style_layers_weights=None, content_layers_weights=None): 
+                 style_layers_weights=None, content_layers_weights=None,
+                 model_weights='pretrained'): 
         
         self.devices = [torch.device(device) for device in devices]
         self.image = None
@@ -302,7 +310,7 @@ class StyleTransfer:
         # The style weights after normalization are:
         # [0.750733137829912,  0.187683284457478,  0.0469208211143695,  0.011730205278592375,  0.002932551319648094]
 
-        self.model = VGGFeatures(self.style_layers + self.content_layers, pooling=pooling)
+        self.model = VGGFeatures(self.style_layers + self.content_layers, pooling=pooling, model_weights=model_weights)
 
         if len(self.devices) == 1:
             device_plan = {0: self.devices[0]}

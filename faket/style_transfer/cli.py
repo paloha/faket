@@ -164,7 +164,7 @@ def main():
     p.add_argument('--devices', type=str, default=[], nargs='+',
                    help='the device names to use (omit for auto)')
     p.add_argument('--random-seed', '-r', type=int, default=0,
-                   help='the random seed')
+                   help='the random seed for optimizer & optionally the model initialization')
     p.add_argument('--content-weight', '-cw', **arg_info('content_weight'),
                    help='the content weight')
     p.add_argument('--tv-weight', '-tw', **arg_info('tv_weight'),
@@ -212,6 +212,8 @@ def main():
                    help='Indices of VGG conv layers features of which are used to compute the loss on content.')
     p.add_argument('--content_layers_weights', '-clw', type=int, nargs='+', default=None,
                    help='Weight of each of the content-layers in the loss computation.')
+    p.add_argument('--model_weights', '-mw', type=str, default='pretrained',
+                   help='Weights of the NST model, one of {"pretrained", "random"}.')
 
     args = p.parse_args()
     start_time = time.time()
@@ -223,7 +225,7 @@ def main():
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
     torch.manual_seed(args.random_seed)
-    
+       
     # Implementing support for mrc file input
     # We normalize the data to interval [0, 1] as is expected by 
     # the NST. We do it on the whole mrc file to keep the relationships 
@@ -314,6 +316,8 @@ def main():
 
     for device in devices:
         torch.tensor(0).to(device)
+        
+        
     torch.manual_seed(args.random_seed)
     
     
@@ -323,7 +327,8 @@ def main():
                        style_layers=args.style_layers, 
                        content_layers=args.content_layers, 
                        style_layers_weights=args.style_layers_weights, 
-                       content_layers_weights=args.content_layers_weights) 
+                       content_layers_weights=args.content_layers_weights,
+                       model_weights=args.model_weights) 
     
     output_image = []
     seq_len = 1 if input_type == 'image' else content_mrc.shape[0]
