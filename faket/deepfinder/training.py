@@ -288,15 +288,15 @@ class Train(core.DeepFinder):
             process_time    = []
         else:
             self.display(f'Restarting training from epoch {self.restart_from_epoch}.')
-            # Load lists with previous history of training statistics:
+            # Load lists with previous history of training statistics (until restart_from_epoch):
             hist = core.read_history(pj(logpath, 'train_history.h5'))
-            hist_loss_train = hist['loss'].tolist()
-            hist_acc_train  = hist['acc'].tolist()
-            hist_loss_valid = hist['val_loss'].tolist()
-            hist_acc_valid  = hist['val_acc'].tolist()
-            hist_f1         = hist['val_f1'].tolist()
-            hist_recall     = hist['val_recall'].tolist()
-            hist_precision  = hist['val_precision'].tolist()
+            hist_loss_train = hist['loss'].tolist()[:self.restart_from_epoch]
+            hist_acc_train  = hist['acc'].tolist()[:self.restart_from_epoch]
+            hist_loss_valid = hist['val_loss'].tolist()[:self.restart_from_epoch]
+            hist_acc_valid  = hist['val_acc'].tolist()[:self.restart_from_epoch]
+            hist_f1         = hist['val_f1'].tolist()[:self.restart_from_epoch]
+            hist_recall     = hist['val_recall'].tolist()[:self.restart_from_epoch]
+            hist_precision  = hist['val_precision'].tolist()[:self.restart_from_epoch]
             process_time    = []
             
         # Load whole dataset:
@@ -361,6 +361,25 @@ class Train(core.DeepFinder):
                 # Write stdout to file immediately
                 fout.flush()
                 
+            # FakET change: compute mean of loss and acc over batches
+            # in case the number of batches changed. I.e. if we train
+            # on N tomograms and later fine-tune on less or more tomograms.
+            # The list_loss & list_acc lengths would not match anymore and
+            # therefore it would not have been possible to convert the loss
+            # and acc history into a numpy array. 
+            def on_nbatch_change(hist_metric_train, list_metric_train):
+                if hist_metric_train:
+                    if len(hist_metric_train[-1]) == 1:
+                        list_metric_train = [np.mean(list_metric_train)]
+                    elif len(hist_metric_train[-1]) != len(list_metric_train):
+                        self.display('Number of batches does not match previous epoch. Storing history of loss and acc mean instead.')
+                        list_metric_train = [np.mean(list_metric_train)]
+                        hist_metric_train = [[np.mean(x)] for x in hist_metric_train]
+                return hist_metric_train, list_metric_train
+            hist_loss_train, list_loss_train = on_nbatch_change(hist_loss_train, list_loss_train)
+            hist_acc_train, list_acc_train = on_nbatch_change(hist_acc_train, list_acc_train)
+            #--------------------------------------------------------------
+            
             hist_loss_train.append(list_loss_train)
             hist_acc_train.append(list_acc_train)
 
@@ -604,7 +623,7 @@ class Train(core.DeepFinder):
                 index = rng.choice(pool)
 
             idx_list.append(index)
-
+            
             tomoID = int(objlist[index]['tomo_idx'])
             tomodim = data[tomoID].shape
 

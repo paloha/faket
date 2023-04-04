@@ -87,8 +87,13 @@ if __name__ == '__main__':
     objl_train = produce_objl.create_objl(path_particle_locations)
 
     # create objl_valid as in the original Deep-Finder repo
-    objl_valid = produce_objl.create_objl([path_particle_locations[-1]], int(args.training_tomogram_ids[-1][0]))
+    # FakET: here is a bug, this line would not work if we want to train only on e.g. tomos 6, 7, 8
+    # objl_valid = produce_objl.create_objl([path_particle_locations[-1]], int(args.training_tomogram_ids[-1][0]))
 
+    # FakET: use last train tomo for validation (using index in training tomo list not model_N)
+    tomoidx = len(path_data) - 1
+    objl_valid = produce_objl.create_objl([path_particle_locations[tomoidx]], tomoidx)
+    
     # Use following line if you want to resume a previous training session:
     if args.continue_training_path is not None:
         from losses import tversky_loss
