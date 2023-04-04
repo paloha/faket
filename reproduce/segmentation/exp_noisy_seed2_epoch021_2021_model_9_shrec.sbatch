@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=exp_noisy_seed2_epoch021_2021_model_9_shrec
-#SBATCH --qos=normal
+#SBATCH --qos=gpus4
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
 #SBATCH --nodes=1
