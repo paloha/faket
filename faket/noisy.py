@@ -257,3 +257,4 @@ def noise_projections(input_mrc, output_mrc, r, std, style_mrc=None, style_means
 
     # Save output
     save_mrc(volume_noisy.astype(np.float32), output_mrc, overwrite=True)
+    

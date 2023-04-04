@@ -3,5 +3,4 @@
 .venv
 aux
 data
-readme-dev.md
-slurmouts
+dev*
