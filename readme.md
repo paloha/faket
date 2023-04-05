@@ -35,7 +35,13 @@ conda activate faket
 
 ----
 
-## Reproducing the results from the paper
+## Viewing the results from the paper in more detail :eyes:
+
+In case you are interested in a deeper dive into the results without actually going through the trouble of reproducing them yourself, visit the `reproduce/arxiv_preprint_results` folder where we stored the final results of presented methods per class or per task along with the details of performance of each of the selected best epochs in csv files. Moreover, in the additional experiment folders you can also find logs of training, segmentation, and clustering, as well as full evaluation of the best epoch on the test tomogram. Most importantly, all the figures are stored in the `figures.ipynb` file and can be just viewed without running anything.
+
+----
+
+## Reproducing the results from the paper :rocket:
 
 ### Prepare the data
 
