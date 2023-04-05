@@ -4,7 +4,7 @@
 This project proposes FakET (pronounced `fake E.T.`), a novel method for simulating the forward operator of a cryo transmission electron microscope to generate synthetic tilt-series. It was created, among other reasons, to generate training data for deep neural networks to solve tasks such as localization and classification of biological particles. It is based on additive noise and neural style transfer. Instead of a calibration protocol, it only requires unlabelled reference data. FakET is capable of simulating large tilt-series, which are common in experimental environments. For example, it can generate a $61\times3500\times3500$ tilt-series on a single *NVIDIA A100 40GB SXM4* GPU in less than 10 minutes. It therefore has the potential to save experts countless hours of manual work in labeling their data sets in pursuit of obtaining annotated data for training their models in a supervised fashion.
 
 
-**Preprint:** The method and its evaluation is described in this paper. :page_facing_up: 
+**Preprint:** The method and its evaluation is described in this paper [arXiv:2304.02011](https://arxiv.org/abs/2304.02011). :page_facing_up: 
 
 **Disclaimer:** This project is still in development. :hammer: \
 We are working on a CLI interface and further validation.
