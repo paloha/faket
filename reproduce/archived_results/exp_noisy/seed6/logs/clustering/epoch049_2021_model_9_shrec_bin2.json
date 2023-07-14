@@ -1,0 +1,24 @@
+{
+    "labelmap_path": "data/results/exp_noisy/seed6/epoch049_2021_model_9_shrec_bin2_labelmap.mrc",
+    "cluster_radius": 5,
+    "cluster_size_threshold": 1,
+    "class_thresholds": {
+        "0": 5000,
+        "1": 5000,
+        "2": 4,
+        "3": 4,
+        "4": 4,
+        "5": 4,
+        "6": 4,
+        "7": 4,
+        "8": 4,
+        "9": 4,
+        "10": 4,
+        "11": 4,
+        "12": 4,
+        "13": 4,
+        "14": 5000,
+        "15": 4
+    },
+    "n_jobs": 1
+}

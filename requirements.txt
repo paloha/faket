@@ -20,7 +20,6 @@ pyqt5==5.15.6                                          # DF
 pyqtgraph==0.12.4                                      # DF
 openpyxl==3.0.9                                        # DF
 radontea==0.4.9                                        # Faket
-git+https://gitlab.com/paloha/gpuMultiprocessing.git   # Faket
 seaborn==0.11.2                                        # SHREC eval
 scikit-plot==0.3.7                                     # SHREC eval
 pycm==3.4                                              # SHREC eval

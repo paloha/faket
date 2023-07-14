@@ -1,0 +1,6 @@
+{
+    "tomogram": "data/shrec2021_extended_dataset/model_9/faket/reconstruction_noiseless.mrc",
+    "model": "data/results/exp_noiseless/seed4/epoch046_weights.h5",
+    "Nclass": 16,
+    "patch_size": 160
+}

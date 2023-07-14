@@ -1,0 +1,23 @@
+{
+    "training_tomograms": [
+        "data/shrec2021_extended_dataset/model_0/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_1/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_2/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_3/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_4/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_5/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_6/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_7/faket/reconstruction_rstyled.mrc",
+        "data/shrec2021_extended_dataset/model_8/faket/reconstruction_rstyled.mrc"
+    ],
+    "num_epochs": 80,
+    "seed": 6,
+    "Nclass": 16,
+    "dim_in": 56,
+    "batch_size": 25,
+    "Nvalid": 10,
+    "flag_direct_read": false,
+    "flag_batch_bootstrap": true,
+    "Lrnd": 13,
+    "class_weights": null
+}

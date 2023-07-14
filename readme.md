@@ -4,7 +4,7 @@
 This project proposes FakET (pronounced `fake E.T.`), a novel method for simulating the forward operator of a cryo transmission electron microscope to generate synthetic tilt-series. It was created, among other reasons, to generate training data for deep neural networks to solve tasks such as localization and classification of biological particles. It is based on additive noise and neural style transfer. Instead of a calibration protocol, it only requires unlabelled reference data. FakET is capable of simulating large tilt-series, which are common in experimental environments. For example, it can generate a $61\times3500\times3500$ tilt-series on a single *NVIDIA A100 40GB SXM4* GPU in less than 10 minutes. It therefore has the potential to save experts countless hours of manual work in labeling their data sets in pursuit of obtaining annotated data for training their models in a supervised fashion.
 
 
-**Preprint:** The method and its evaluation is described in this paper [arXiv:2304.02011](https://arxiv.org/abs/2304.02011). :page_facing_up: 
+**Preprint:** The method and its evaluation is described in this paper [arXiv:2304.02011](https://arxiv.org/abs/2304.02011). :page_facing_up:
 
 **Disclaimer:** This project is still in development. :hammer: \
 We are working on a CLI interface and further validation.
@@ -37,7 +37,7 @@ conda activate faket
 
 ## Viewing the results from the paper in more detail :eyes:
 
-In case you are interested in a deeper dive into the results without actually going through the trouble of reproducing them yourself, visit the `reproduce/arxiv_preprint_results` folder where we stored the final results of presented methods per class or per task along with the details of performance of each of the selected best epochs in csv files. Moreover, in the additional experiment folders you can also find logs of training, segmentation, and clustering, as well as full evaluation of the best epoch on the test tomogram. Most importantly, all the figures are stored in the `figures.ipynb` file and can be just viewed without running anything.
+In case you are interested in a deeper dive into the results without actually going through the trouble of reproducing them yourself, visit the `reproduce/archived_results` folder where we stored the final results of presented methods per class or per task along with the details of performance of each of the selected best epochs in csv files. Moreover, in the additional experiment folders you can also find logs of training, segmentation, and clustering, as well as full evaluation of the best epoch on the test tomogram. Most importantly, all the figures are stored in the `figures.ipynb` file and can be just viewed without running anything.
 
 ----
 
