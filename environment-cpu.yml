@@ -1,0 +1,32 @@
+####################################################################
+# faketCPU CONDA ENVIRONMENT (approx 2.9GB in size)
+# CPU ONLY dependencies for FakET
+# Not for reproducing the paper, only for running a simulation
+####################################################################
+# TESTED ON: 16.04.2024
+# OS Version: Ubuntu 20.04.6 LTS
+# CPU: Dual AMD EPYC 7742 64-Core Processor (2x64 cores)
+####################################################################
+# NOTES ON PACKAGE VERSIONS
+#  Neural Style Transfer requires at least PyTorch 1.7.1.
+#  In our paper-reproducing GPU environment, we had to use Pytorch=1.10.
+#  HERE WE USE THE CPU VERSIONS OF THE SAME PACKAGES.
+#  Installing torchvision cpu via conda did not work
+#  so we resorted to using pip for this particular package.
+####################################################################
+
+name: faketCPU
+dependencies:
+  - python=3.11.8  
+  - pytorch::pytorch=2.2.1
+  - pytorch::torchvision=0.17.1
+  - pytorch::cpuonly
+  - conda-forge::mrcfile=1.5.0
+  - scikit-image=0.22.0
+  - numpy=1.26.4
+  - matplotlib=3.8.0
+  - pillow=10.2.0
+  - tqdm=4.65.0
+  - pip>=23.3
+  - pip:
+    - radontea==0.4.9 # Not strictly necessary unless you want to reconstruct 3D volumes

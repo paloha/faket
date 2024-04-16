@@ -1,12 +1,14 @@
 ####################################################################
-# FAKET CONDA ENVIRONMENT (approx. 6.5GB in size)
+# faketREPRODUCE CONDA ENVIRONMENT (approx. 9.7GB in size)
 # Dependencies for Faket + Neural Style Transfer + DeepFinder
+# This is the environment for reproducing the experiments in the paper
 ####################################################################
-# TESTED ON: 10.01.2023
-# OS Version: Ubuntu 20.04.3 LTS
-# NVIDIA Driver Version: 510.47.03
-# CUDA Version: 11.6
+# TESTED ON: 10.01.2023, 16.02.2024, 16.04.2024
+# OS Versions: Ubuntu 20.04.3 LTS, 20.04.6 LTS, 20.04.6 LTS
+# NVIDIA Driver Versions: 510.47.03, 510.85.02, 550.54.15
+# CUDA Versions: 11.6, 12.4
 # GPU Model: NVIDIA A100-SXM4 40GB
+# CPU: Dual AMD EPYC 7742 64-Core Processor (2x64 cores)
 ####################################################################
 # NOTES ON PACKAGE VERSIONS
 #  DeepFinder requires tensorflow-gpu==2.6.0.
@@ -17,16 +19,17 @@
 #  we use PyTorch=1.10 which requires CUDA 11.3.
 ####################################################################
 
-name: faket
+name: faketREPRODUCE
 dependencies:
   - python=3.9
   - cudatoolkit=11.3.1                                      # GPU
-  - cudnn=8.2.1.32                                          # GPU
+  - conda-forge::cudnn=8.2.1.32                             # GPU
   - conda-forge::tensorflow-gpu=2.6.0                       # DF  
   - keras=2.6.0                                             # DF
   - pytorch::pytorch=1.10.2                                 # NST
   - pytorch::torchvision=0.11.3                             # NST
-  - scikit-learn=0.24.2                                     # DF + Faket
+  - conda-forge::mrcfile=1.3.0
+  - scikit-learn=0.24.2                                     # DF
   - scikit-image=0.19.2                                     # DF + NST
   - numpy=1.19.5                                            # DF + NST
   - matplotlib=3.5.1                                        # DF + NST
@@ -38,7 +41,6 @@ dependencies:
   - pip>=21.2
   - pip:
     - lxml==4.8.0                                            # DF
-    - mrcfile==1.3.0                                         # DF
     - pyqt5==5.15.6                                          # DF
     - pyqtgraph==0.12.4                                      # DF
     - openpyxl==3.0.9                                        # DF

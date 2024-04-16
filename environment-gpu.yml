@@ -1,0 +1,36 @@
+####################################################################
+# faketGPU CONDA ENVIRONMENT (approx 8.9GB in size)
+# GPU dependencies for FakET
+# Not for reproducing the paper, only for running a simulation
+####################################################################
+# TESTED ON: 16.04.2024
+# OS Version: Ubuntu 20.04.6 LTS
+# NVIDIA Driver Version: 550.54.15
+# CUDA Version: 12.4
+# GPU Model: NVIDIA A100-SXM4 40GB
+# CPU: Dual AMD EPYC 7742 64-Core Processor (2x64 cores)
+####################################################################
+# NOTES ON PACKAGE VERSIONS
+#  Here we provide the newest currently available packages
+#  PyTorch will warn about depricated "pretrained" param but its OK
+#  Computation seems to be faster with these newer packages
+####################################################################
+
+name: faketGPU
+channels:
+  - nvidia
+dependencies:
+  - python=3.11.8  
+  - pytorch::pytorch-cuda=12.1
+  - conda-forge::cudnn=8.9.7.29
+  - pytorch::pytorch=2.2.1                                 
+  - pytorch::torchvision=0.17.1
+  - conda-forge::mrcfile=1.5.0
+  - scikit-image=0.22.0
+  - numpy=1.26.4
+  - matplotlib=3.8.0
+  - pillow=10.2.0
+  - tqdm=4.65.0
+  - pip>=23.3
+  - pip:
+    - radontea==0.4.9 # Not strictly necessary unless you want to reconstruct 3D volumes

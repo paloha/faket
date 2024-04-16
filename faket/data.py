@@ -3,7 +3,6 @@ import csv
 import json
 import mrcfile
 import zipfile
-import radontea
 import numpy as np
 from numpy.fft import fft2, ifft2
 
