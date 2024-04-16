@@ -214,6 +214,8 @@ def main():
                    help='Weight of each of the content-layers in the loss computation.')
     p.add_argument('--model_weights', '-mw', type=str, default='pretrained',
                    help='Weights of the NST model, one of {"pretrained", "random"}.')
+    p.add_argument('--ncpus', '-n', type=int, default=0,
+                   help='Number of CPU threads to use when device used is cpu. Ignored otherwise.')
 
     args = p.parse_args()
     start_time = time.time()
@@ -224,6 +226,15 @@ def main():
     np.random.seed(args.random_seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+    # Read the following discussion to learn about benchmark and deterministic options
+    # https://discuss.pytorch.org/t/what-is-the-differenc-between-cudnn-deterministic-and-cudnn-benchmark/38054
+    # torch.backends.cudnn.deterministic=True - will only allow those CuDNN algorithms that are (believed to be) deterministic
+    # torch.backends.cudnn.benchmark=True - the CuDNN library will benchmark several algorithms and pick that which it found to be fastest
+    # so benchmark=True potentially leads to faster execution but larger memory peaks
+    # warning: benchmarking may pick a different algorithm even with the deterministic flag is set
+    # CONCLUSION: in order to be able to reproduce the results of our paper, for now we keep
+    # benchmark=False and deterministic=True. In the future, this could/should change to optimize for speed
+    # maybe could even become an argument? Let's see.
     torch.manual_seed(args.random_seed)
        
     # Implementing support for mrc file input
@@ -295,13 +306,14 @@ def main():
         sys.exit(1)
     print('Using devices:', ' '.join(str(device) for device in devices))
 
-    if devices[0].type == 'cpu':
-        print('CPU threads:', torch.get_num_threads())
+    if devices[0].type == 'cpu' and args.ncpus:
+        torch.set_num_threads(args.ncpus) 
+        print('CPU threads used:', torch.get_num_threads())
     if devices[0].type == 'cuda':
         for i, device in enumerate(devices):
             props = torch.cuda.get_device_properties(device)
             print(f'GPU {i} type: {props.name} (compute {props.major}.{props.minor})')
-            print(f'GPU {i} RAM:', round(props.total_memory / 1024 / 1024), 'MB')
+            print(f'GPU {i} VRAM:', round(props.total_memory / 1024 / 1024), 'MiB')
 
     # Handling end scale
     end_scale = int(args.end_scale.rstrip('+'))
