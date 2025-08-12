@@ -84,7 +84,7 @@ The original experiments were done on a headless server with the following speci
 1. Create `data/shrec2021_extended_dataset` folder.
 1. Download `shrec2021_original_groundtruth.zip` and `shrec2021_full_dataset.zip` files into it from [here](https://dataverse.nl/dataset.xhtml?persistentId=doi:10.34894/XRTJMA).
 1. Extract the `shrec2021_original_groundtruth.zip` first.
-1. Rename all `model_x/groundtruth.mrc` to `model_x/groundtruth_unbinned.mrc`.
+1. Rename all `model_x/grandmodel.mrc` to `model_x/grandmodel_unbinned.mrc`.
 1. Extract the `shrec2021_full_dataset.zip` into the same directory.
 
 The original_groundtruth zip contains 3 additional files per tomogram:
